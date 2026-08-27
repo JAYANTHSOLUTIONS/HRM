@@ -1,0 +1,521 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400&display=swap');
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+:root {
+  --df-surface: #F1F4F8;
+  --df-card: #FFFFFF;
+  --df-navy: #1C2B3A;
+  --df-navy-mid: #344F6A;
+  --df-blue: #2563EB;
+  --df-blue-light: #EFF4FF;
+  --df-border: #D1D9E0;
+  --df-text-muted: #6B7E94;
+  --df-text-sub: #8FA3B8;
+
+  --df-present: #059669;
+  --df-present-bg: #ECFDF5;
+  --df-absent: #DC2626;
+  --df-absent-bg: #FEF2F2;
+  --df-leave: #7C3AED;
+  --df-leave-bg: #F5F3FF;
+  --df-pending: #D97706;
+  --df-pending-bg: #FFFBEB;
+  --df-approved: #059669;
+  --df-approved-bg: #ECFDF5;
+  --df-rejected: #DC2626;
+  --df-rejected-bg: #FEF2F2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--df-surface);
+  color: var(--df-navy);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6,
+.font-display {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Tabular numbers for data columns */
+.tabnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-family: 'Inter', monospace;
+}
+
+/* Top Navbar */
+.df-navbar {
+  background: var(--df-navy);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 8px;
+}
+
+.df-logo {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: #FFFFFF;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 32px;
+  text-decoration: none;
+}
+
+.df-logo-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--df-blue);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: white;
+  font-weight: 800;
+}
+
+.df-nav-link {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 500;
+  font-size: 13.5px;
+  color: rgba(255,255,255,0.65);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  text-decoration: none;
+  border: none;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.df-nav-link:hover {
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.08);
+}
+
+.df-nav-link.active {
+  color: #FFFFFF;
+  background: rgba(255,255,255,0.12);
+}
+
+/* Page content */
+.df-page {
+  padding: 28px 32px;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+/* Stat cards */
+.df-stat-card {
+  background: var(--df-card);
+  border: 1px solid var(--df-border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+}
+
+.df-stat-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--df-text-muted);
+}
+
+.df-stat-value {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--df-navy);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.df-stat-sub {
+  font-size: 12px;
+  color: var(--df-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* Punch-strip status badge */
+.df-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px 3px 7px;
+  border-radius: 4px;
+  border-left: 3px solid currentColor;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.df-badge-present {
+  color: var(--df-present);
+  background: var(--df-present-bg);
+  border-color: var(--df-present);
+}
+
+.df-badge-absent {
+  color: var(--df-absent);
+  background: var(--df-absent-bg);
+  border-color: var(--df-absent);
+}
+
+.df-badge-leave {
+  color: var(--df-leave);
+  background: var(--df-leave-bg);
+  border-color: var(--df-leave);
+}
+
+.df-badge-pending {
+  color: var(--df-pending);
+  background: var(--df-pending-bg);
+  border-color: var(--df-pending);
+}
+
+.df-badge-approved {
+  color: var(--df-approved);
+  background: var(--df-approved-bg);
+  border-color: var(--df-approved);
+}
+
+.df-badge-rejected {
+  color: var(--df-rejected);
+  background: var(--df-rejected-bg);
+  border-color: var(--df-rejected);
+}
+
+/* Tables */
+.df-table-wrap {
+  background: var(--df-card);
+  border: 1px solid var(--df-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.df-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.df-table thead th {
+  background: #F7F9FB;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--df-text-muted);
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--df-border);
+  white-space: nowrap;
+}
+
+.df-table tbody tr {
+  border-bottom: 1px solid #EDF0F4;
+  transition: background 0.1s;
+}
+
+.df-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.df-table tbody tr:hover {
+  background: #F7F9FB;
+}
+
+.df-table tbody td {
+  padding: 11px 16px;
+  font-size: 13.5px;
+  color: var(--df-navy);
+  vertical-align: middle;
+}
+
+/* Compact table density */
+.df-table-compact thead th {
+  padding: 8px 14px;
+}
+
+.df-table-compact tbody td {
+  padding: 8px 14px;
+}
+
+/* Section heading */
+.df-section-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--df-navy);
+  margin: 0;
+}
+
+.df-section-sub {
+  font-size: 13px;
+  color: var(--df-text-muted);
+  margin: 0;
+}
+
+/* Cards */
+.df-card {
+  background: var(--df-card);
+  border: 1px solid var(--df-border);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+
+/* Buttons */
+.df-btn-primary {
+  background: var(--df-blue);
+  color: white;
+  border: none;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+
+.df-btn-primary:hover {
+  background: #1d4ed8;
+  color: white;
+}
+
+.df-btn-secondary {
+  background: white;
+  color: var(--df-navy);
+  border: 1px solid var(--df-border);
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+  text-decoration: none;
+}
+
+.df-btn-secondary:hover {
+  background: var(--df-surface);
+  border-color: #B0BEC5;
+  color: var(--df-navy);
+}
+
+.df-btn-approve {
+  background: var(--df-approved-bg);
+  color: var(--df-approved);
+  border: 1px solid #A7F3D0;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+
+.df-btn-approve:hover {
+  background: #D1FAE5;
+}
+
+.df-btn-reject {
+  background: var(--df-rejected-bg);
+  color: var(--df-rejected);
+  border: 1px solid #FECACA;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+
+.df-btn-reject:hover {
+  background: #FEE2E2;
+}
+
+/* Avatar */
+.df-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  color: var(--df-navy);
+  flex-shrink: 0;
+}
+
+/* Tabs */
+.df-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--df-border);
+  gap: 0;
+}
+
+.df-tab {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--df-text-muted);
+  padding: 10px 20px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.df-tab:hover {
+  color: var(--df-navy);
+}
+
+.df-tab.active {
+  color: var(--df-blue);
+  border-bottom-color: var(--df-blue);
+}
+
+/* Empty state */
+.df-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--df-text-muted);
+}
+
+.df-empty-icon {
+  font-size: 36px;
+  opacity: 0.35;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.df-empty-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--df-navy-mid);
+  margin: 0 0 4px;
+}
+
+.df-empty-sub {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Input */
+.df-input {
+  border: 1px solid var(--df-border);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  font-family: 'Inter', sans-serif;
+  color: var(--df-navy);
+  background: white;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.df-input:focus {
+  border-color: var(--df-blue);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+/* Modal Overlay */
+.df-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.df-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--df-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B0BEC5;
+}

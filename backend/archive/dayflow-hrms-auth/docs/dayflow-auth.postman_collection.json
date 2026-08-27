@@ -1,0 +1,153 @@
+{
+  "info": {
+    "name": "Dayflow HRMS - Auth Service (Part 1)",
+    "description": "Authentication & security foundation endpoints for Dayflow HRMS.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000/api/v1" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "verification_token", "value": "PASTE_TOKEN_FROM_EMAIL_LOG" },
+    { "key": "reset_otp", "value": "PASTE_OTP_FROM_EMAIL_LOG" },
+    { "key": "captcha_token", "value": "test-captcha-token" }
+  ],
+  "item": [
+    {
+      "name": "Signup",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/signup",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Asha\",\n  \"last_name\": \"Singh\",\n  \"email\": \"asha.singh@dayflow.dev\",\n  \"password\": \"StrongPass!234\",\n  \"department_id\": 1,\n  \"designation_id\": 1,\n  \"joining_date\": \"2026-09-01\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Verify Email",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/verify-email",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{verification_token}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.collectionVariables.set('access_token', body.access_token);",
+              "  pm.collectionVariables.set('refresh_token', body.refresh_token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"asha.singh@dayflow.dev\",\n  \"password\": \"StrongPass!234\",\n  \"captcha_token\": \"{{captcha_token}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Refresh Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.collectionVariables.set('access_token', body.access_token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/refresh",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/auth/logout",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Forgot Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/forgot-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"asha.singh@dayflow.dev\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/reset-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"asha.singh@dayflow.dev\",\n  \"token\": \"{{reset_otp}}\",\n  \"new_password\": \"EvenStronger!456\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Change Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/auth/change-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"StrongPass!234\",\n  \"new_password\": \"EvenStronger!456\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8000/health"
+      }
+    }
+  ]
+}

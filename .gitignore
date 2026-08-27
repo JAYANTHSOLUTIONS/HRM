@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.env copy
+
+# Local application data
+storage/documents/*
+storage/profile-images/*
+storage/profile_images/*
+!storage/documents/.gitkeep
+!storage/profile-images/.gitkeep
+!storage/profile_images/.gitkeep
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Archives and local exports
+*.rar
+*.zip
