@@ -1,17 +1,21 @@
 import secrets
 import string
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models.auth import User, Role
-from app.models.hr import Employee
+from app.models.hr import Employee, Department, Designation
 from app.exceptions import conflict, bad_request
 from app.services.employee_code import generate_employee_code
 from app.services.audit_service import write_audit_log
 from app.services.notification_service import notify
+from app.services.email import send_invitation_email
 from app.core.security import hash_password
 from app.schemas.admin import UserInviteRequest
+
+logger = logging.getLogger(__name__)
 
 
 def _generate_temp_password(length: int = 14) -> str:
@@ -39,7 +43,7 @@ def invite_user(db: Session, *, payload: UserInviteRequest, invited_by_user_id: 
         email=payload.email,
         password_hash=hash_password(temp_password),
         role_id=role.role_id,
-        is_email_verified=False,
+        is_email_verified=True,
         is_active=True,
     )
     db.add(user)
@@ -71,9 +75,33 @@ def invite_user(db: Session, *, payload: UserInviteRequest, invited_by_user_id: 
         message="Your account has been created. Check your email for your temporary password.",
     )
 
-    # In production this goes through a real email service (SMTP settings in .env).
-    # Kept as a hook here so Part 2 doesn't silently swallow the credential.
-    _send_invitation_email(payload.email, employee_code, temp_password)
+    # Resolve department and designation names for the invitation email
+    department_name = None
+    if payload.department_id:
+        dept = db.query(Department).filter(Department.department_id == payload.department_id).first()
+        department_name = dept.department_name if dept else None
+
+    designation_title = None
+    if payload.designation_id:
+        desig = db.query(Designation).filter(Designation.designation_id == payload.designation_id).first()
+        designation_title = desig.title if desig else None
+
+    # Send the invitation email via SMTP (Cloudflare / configured provider).
+    # Email delivery failure is logged but does not block user creation.
+    employee_name = f"{payload.first_name} {payload.last_name}".strip()
+    try:
+        send_invitation_email(
+            email=payload.email,
+            employee_name=employee_name,
+            employee_code=employee_code,
+            temp_password=temp_password,
+            role=payload.role,
+            department=department_name,
+            designation=designation_title,
+            joining_date=str(payload.joining_date),
+        )
+    except Exception as exc:
+        logger.error(f"Invitation email to {payload.email} failed: {exc}")
 
     db.commit()
     db.refresh(user)
@@ -86,9 +114,3 @@ def invite_user(db: Session, *, payload: UserInviteRequest, invited_by_user_id: 
         "message": "Invitation sent. A system-generated temporary password has been emailed.",
     }
 
-
-def _send_invitation_email(email: str, employee_code: str, temp_password: str) -> None:
-    """Placeholder for SMTP integration — wire up with app.core.config SMTP_* settings."""
-    # e.g. via smtplib / an email provider SDK. Intentionally not blocking user creation
-    # on email delivery failure; log and continue in real implementation.
-    pass

@@ -46,9 +46,67 @@ function Badge({ status }) {
 
 function Spinner() { return <div className="d-flex justify-content-center py-5"><div className="spinner-border text-primary" role="status" /></div> }
 
+function FeedbackModal({ feedback, onClose }) {
+  if (!feedback) return null
+  const { type = 'info', title, message, details } = feedback
+  return (
+    <div className="df-feedback-overlay" onClick={onClose}>
+      <div className="df-feedback-modal" onClick={e => e.stopPropagation()}>
+        <div className={`df-icon-box ${type}`}>
+          <svg className="df-svg-icon" viewBox="0 0 52 52">
+            <circle className={`df-circle-path ${type}`} cx="26" cy="26" r="23" fill="none" />
+            {type === 'success' && (
+              <path className="df-tick-path" fill="none" d="M14 27 l7 7 l17 -17" />
+            )}
+            {type === 'error' && (
+              <>
+                <path className="df-cross-path1" fill="none" d="M16 16 L36 36" />
+                <path className="df-cross-path2" fill="none" d="M36 16 L16 36" />
+              </>
+            )}
+            {type === 'info' && (
+              <>
+                <circle cx="26" cy="17" r="2.5" fill="#3B82F6" />
+                <path className="df-info-path" fill="none" d="M26 24 L26 36" />
+              </>
+            )}
+          </svg>
+        </div>
+        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px', color: 'var(--df-navy)' }}>{title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notice')}</h3>
+        <p style={{ fontSize: 14, color: 'var(--df-text-muted)', margin: '0 0 16px', lineHeight: 1.5 }}>{message}</p>
+        {details && (
+          <div style={{
+            background: type === 'success' ? '#ECFDF5' : type === 'error' ? '#FEF2F2' : '#F1F5F9',
+            border: `1px solid ${type === 'success' ? '#A7F3D0' : type === 'error' ? '#FECACA' : '#CBD5E1'}`,
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 13,
+            color: type === 'success' ? '#065F46' : type === 'error' ? '#991B1B' : '#334155',
+            fontWeight: 600,
+            marginBottom: 20,
+            fontFamily: 'monospace',
+            wordBreak: 'break-all'
+          }}>
+            {details}
+          </div>
+        )}
+        <button
+          className={type === 'error' ? 'df-btn-secondary w-100 py-2' : 'df-btn-primary w-100 py-2'}
+          style={{ borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          onClick={onClose}
+        >
+          {type === 'success' ? 'Done' : type === 'error' ? 'Close' : 'OK'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Alert({ msg, type = 'danger', onClose }) {
   if (!msg) return null
-  return <div className={`alert alert-${type} alert-dismissible fade show`} role="alert">{msg}<button className="btn-close" onClick={onClose} /></div>
+  const feedbackType = type === 'danger' ? 'error' : type === 'success' ? 'success' : 'info'
+  const title = type === 'danger' ? 'Notice / Error' : type === 'success' ? 'Operation Complete' : 'Information'
+  return <FeedbackModal feedback={{ type: feedbackType, title, message: msg }} onClose={onClose} />
 }
 
 function TurnstileWidget({ onToken }) {

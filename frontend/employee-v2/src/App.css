@@ -519,3 +519,134 @@ h1, h2, h3, h4, h5, h6,
 ::-webkit-scrollbar-thumb:hover {
   background: #B0BEC5;
 }
+
+/* ─── Animated Popup Modal (Tick / Cross / Info) ────────────────────────────── */
+.df-feedback-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: dfFadeIn 0.25s ease-out forwards;
+}
+
+.df-feedback-modal {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 32px 28px 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  animation: dfPopScale 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes dfFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dfPopScale {
+  0% { opacity: 0; transform: scale(0.75); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Icon Container & Animations */
+.df-icon-box {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: relative;
+}
+
+.df-icon-box.success {
+  background: #ECFDF5;
+  color: #10B981;
+  box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.15);
+}
+
+.df-icon-box.error {
+  background: #FEF2F2;
+  color: #EF4444;
+  box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.15);
+}
+
+.df-icon-box.info {
+  background: #EFF6FF;
+  color: #3B82F6;
+  box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.15);
+}
+
+.df-svg-icon {
+  width: 56px;
+  height: 56px;
+}
+
+/* SVG Stroke Drawing Animations */
+.df-circle-path {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 3;
+  stroke-miterlimit: 10;
+  animation: strokeDraw 0.5s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.df-circle-path.success { stroke: #10B981; }
+.df-circle-path.error { stroke: #EF4444; }
+.df-circle-path.info { stroke: #3B82F6; }
+
+.df-tick-path {
+  stroke: #10B981;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: strokeDraw 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+}
+
+.df-cross-path1 {
+  stroke: #EF4444;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: strokeDraw 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+}
+
+.df-cross-path2 {
+  stroke: #EF4444;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: strokeDraw 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.45s forwards;
+}
+
+.df-info-path {
+  stroke: #3B82F6;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: strokeDraw 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+}
+
+@keyframes strokeDraw {
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+

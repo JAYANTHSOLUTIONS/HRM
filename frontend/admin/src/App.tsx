@@ -198,6 +198,70 @@ const SALARY_COMPONENTS = [
   { label: "Retirement (401k)", amount: -375, type: "deduction" },
 ];
 
+// ─── Feedback Modal (Animated Tick / Cross / Info) ─────────────────────────
+
+export interface FeedbackState {
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+  details?: string;
+}
+
+export function FeedbackModal({ feedback, onClose }: { feedback: FeedbackState; onClose: () => void }) {
+  const { type, title, message, details } = feedback;
+  return (
+    <div className="df-feedback-overlay" onClick={onClose}>
+      <div className="df-feedback-modal" onClick={e => e.stopPropagation()}>
+        <div className={`df-icon-box ${type}`}>
+          <svg className="df-svg-icon" viewBox="0 0 52 52">
+            <circle className={`df-circle-path ${type}`} cx="26" cy="26" r="23" fill="none" />
+            {type === "success" && (
+              <path className="df-tick-path" fill="none" d="M14 27 l7 7 l17 -17" />
+            )}
+            {type === "error" && (
+              <>
+                <path className="df-cross-path1" fill="none" d="M16 16 L36 36" />
+                <path className="df-cross-path2" fill="none" d="M36 16 L16 36" />
+              </>
+            )}
+            {type === "info" && (
+              <>
+                <circle cx="26" cy="17" r="2.5" fill="#3B82F6" />
+                <path className="df-info-path" fill="none" d="M26 24 L26 36" />
+              </>
+            )}
+          </svg>
+        </div>
+        <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px", color: "var(--df-navy)" }}>{title}</h3>
+        <p style={{ fontSize: 14, color: "var(--df-text-muted)", margin: "0 0 16px", lineHeight: 1.5 }}>{message}</p>
+        {details && (
+          <div style={{
+            background: type === "success" ? "#ECFDF5" : type === "error" ? "#FEF2F2" : "#F1F5F9",
+            border: `1px solid ${type === "success" ? "#A7F3D0" : type === "error" ? "#FECACA" : "#CBD5E1"}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: 13,
+            color: type === "success" ? "#065F46" : type === "error" ? "#991B1B" : "#334155",
+            fontWeight: 600,
+            marginBottom: 20,
+            fontFamily: "monospace",
+            wordBreak: "break-all"
+          }}>
+            {details}
+          </div>
+        )}
+        <button
+          className={type === "error" ? "df-btn-secondary w-100 py-2" : "df-btn-primary w-100 py-2"}
+          style={{ borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+          onClick={onClose}
+        >
+          {type === "success" ? "Done" : type === "error" ? "Close" : "OK"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function Avatar({ emp, size = 32 }: { emp: Employee; size?: number }) {
@@ -407,6 +471,7 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
   const [inviteError, setInviteError] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const depts = ["All", ...Array.from(new Set(employees.map(e => e.department)))];
   const filtered = employees.filter(e =>
     (dept === "All" || e.department === dept) &&
@@ -440,10 +505,20 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
         designation_id: Number(form.get("designation_id")) || undefined,
       }, token);
       await refresh();
-      setInviteMessage(`${result.message} Employee code: ${result.employee_code}`);
+      setShowInvite(false);
+      setFeedback({
+        type: "success",
+        title: "Invitation Sent!",
+        message: result.message || "Invitation email with credentials has been sent.",
+        details: `Employee Code: ${result.employee_code}`,
+      });
       event.currentTarget.reset();
     } catch (error) {
-      setInviteError(error instanceof Error ? error.message : "Unable to invite employee");
+      setFeedback({
+        type: "error",
+        title: "Invitation Failed",
+        message: error instanceof Error ? error.message : "Unable to invite employee",
+      });
     } finally {
       setInviteBusy(false);
     }
@@ -554,6 +629,7 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
           </div>
         </div>
       )}
+      {feedback && <FeedbackModal feedback={feedback} onClose={() => setFeedback(null)} />}
     </div>
   );
 }
@@ -1670,6 +1746,7 @@ function TimeOff() {
   const { employees, requests: loadedRequests, refresh, token } = useHRData();
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [filter, setFilter] = useState<"all" | TimeOffStatus>("all");
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   useEffect(() => setRequests(loadedRequests), [loadedRequests]);
 
@@ -1677,8 +1754,17 @@ function TimeOff() {
     try {
       await api.reviewLeave(id, decision === "approved" ? "approve" : "reject", token);
       await refresh();
+      setFeedback({
+        type: "success",
+        title: decision === "approved" ? "Leave Approved!" : "Leave Rejected",
+        message: `The leave request has been successfully ${decision}.`,
+      });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to update request");
+      setFeedback({
+        type: "error",
+        title: "Update Failed",
+        message: error instanceof Error ? error.message : "Unable to update request",
+      });
     }
   }
 
@@ -1775,6 +1861,7 @@ function TimeOff() {
           </tbody>
         </table>
       </div>
+      {feedback && <FeedbackModal feedback={feedback} onClose={() => setFeedback(null)} />}
     </div>
   );
 }
@@ -1850,6 +1937,7 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1859,14 +1947,24 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
     try {
       if (mode === "register") {
         const result = await signup({ first_name: firstName, last_name: lastName, email, password, department_id: Number(departmentId), designation_id: Number(designationId), joining_date: joiningDate });
-        setMessage(result.message);
+        setFeedback({
+          type: "success",
+          title: "Account Created!",
+          message: result.message || "Your account has been successfully registered. You may now sign in.",
+        });
         setMode("login");
       } else {
         const session = await login(email, password);
         onLogin(session.access_token, session.refresh_token, session.user);
       }
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Unable to sign in");
+      const errMsg = loginError instanceof Error ? loginError.message : "Unable to sign in";
+      setError(errMsg);
+      setFeedback({
+        type: "error",
+        title: mode === "login" ? "Sign In Failed" : "Registration Failed",
+        message: errMsg,
+      });
     } finally {
       setBusy(false);
     }
@@ -1894,6 +1992,7 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
       <button className="df-btn-primary w-100 justify-content-center" disabled={busy}>{busy ? "Please wait..." : mode === "login" ? "Sign in" : "Register"}</button>
       <button type="button" className="df-btn-secondary w-100 justify-content-center mt-2" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); setMessage(""); }}>{mode === "login" ? "Create an account" : "Back to sign in"}</button>
     </form>
+    {feedback && <FeedbackModal feedback={feedback} onClose={() => setFeedback(null)} />}
   </div>;
 }
 
