@@ -803,12 +803,24 @@ const INITIAL_RESUME_DATA: Record<number, ResumeDetails> = {
 function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: number; onBack: () => void; initialTab?: EmployeeTab }) {
   const { employees, token } = useHRData();
   const [tab, setTab] = useState<EmployeeTab>(initialTab);
-  const emp = employees.find(e => e.id === empId) ?? employees[0];
+  const emp = employees.find(e => e.id === empId);
   const [salary, setSalary] = useState<ApiSalary | null>(null);
 
   useEffect(() => {
-    void api.salary(empId, token).then(setSalary).catch(() => setSalary(null));
+    if (empId && token) {
+      void api.salary(empId, token).then(setSalary).catch(() => setSalary(null));
+    }
   }, [empId, token]);
+
+  if (!emp) {
+    return (
+      <div className="df-page text-center py-5">
+        <div className="spinner-border text-primary mb-3" role="status" />
+        <p className="text-muted">Loading employee details or employee not found...</p>
+        <button className="df-btn-secondary mt-2" onClick={onBack}>Go Back</button>
+      </div>
+    );
+  }
 
   useEffect(() => {
     setTab(initialTab);
