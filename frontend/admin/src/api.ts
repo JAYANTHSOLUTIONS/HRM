@@ -131,7 +131,7 @@ export const api = {
   departments: (token: string) => request<{ items: ApiDepartment[] }>("/departments", {}, token),
   designations: (token: string) => request<{ items: ApiDesignation[] }>("/designations", {}, token),
   inviteEmployee: (payload: {
-    email: string; first_name: string; last_name: string; role: "HR" | "ADMIN";
+    email: string; first_name: string; last_name: string; role: "HR" | "ADMIN" | "EMPLOYEE";
     department_id?: number; designation_id?: number; joining_date: string;
   }, token: string) => request<{ employee_code: string; message: string }>("/admin/users/invite", {
     method: "POST", body: JSON.stringify(payload),

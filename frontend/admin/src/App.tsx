@@ -518,7 +518,7 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
         email: String(form.get("email")),
         first_name: String(form.get("first_name")),
         last_name: String(form.get("last_name")),
-        role: String(form.get("role")) as "HR" | "ADMIN",
+        role: String(form.get("role")) as "HR" | "ADMIN" | "EMPLOYEE",
         joining_date: String(form.get("joining_date")),
         department_id: Number(form.get("department_id")) || undefined,
         designation_id: Number(form.get("designation_id")) || undefined,
@@ -636,7 +636,7 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
               <label className="form-label">Work email</label>
               <input className="df-input w-100 mb-3" name="email" type="email" required />
               <div className="d-flex gap-2">
-                <div className="flex-fill"><label className="form-label">Role</label><select className="df-input w-100 mb-3" name="role" defaultValue="HR"><option value="HR">HR</option><option value="ADMIN">Admin</option></select></div>
+                <div className="flex-fill"><label className="form-label">Role</label><select className="df-input w-100 mb-3" name="role" defaultValue="EMPLOYEE"><option value="EMPLOYEE">Employee</option><option value="HR">HR</option><option value="ADMIN">Admin</option></select></div>
                 <div className="flex-fill"><label className="form-label">Joining date</label><input className="df-input w-100 mb-3" name="joining_date" type="date" required /></div>
               </div>
               <div className="d-flex gap-2">

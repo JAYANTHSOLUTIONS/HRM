@@ -24,8 +24,8 @@ def _generate_temp_password(length: int = 14) -> str:
 
 
 def invite_user(db: Session, *, payload: UserInviteRequest, invited_by_user_id: int) -> dict:
-    if payload.role not in ("HR", "ADMIN"):
-        raise bad_request("Only HR or ADMIN roles may be created through this endpoint.")
+    if payload.role not in ("HR", "ADMIN", "EMPLOYEE"):
+        raise bad_request("Only HR, ADMIN, or EMPLOYEE roles may be created through this endpoint.")
 
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing is not None:

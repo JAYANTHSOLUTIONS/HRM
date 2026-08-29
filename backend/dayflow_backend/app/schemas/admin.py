@@ -6,7 +6,7 @@ class UserInviteRequest(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-    role: str = Field(pattern="^(HR|ADMIN)$")
+    role: str = Field(pattern="^(HR|ADMIN|EMPLOYEE)$")
     department_id: int | None = None
     designation_id: int | None = None
     joining_date: date
