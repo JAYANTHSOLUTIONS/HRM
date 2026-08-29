@@ -19,6 +19,7 @@ interface Employee {
   joinDate: string;
   status: "active" | "inactive";
   avatarColor: string;
+  profilePictureUrl?: string;
 }
 
 interface TimeOffRequest {
@@ -78,6 +79,7 @@ function mapEmployee(employee: ApiEmployee): Employee {
     joinDate: employee.joining_date ?? "",
     status: employee.employment_status === "ACTIVE" ? "active" : "inactive",
     avatarColor: ["#1e40af", "#0f766e", "#b45309", "#dc2626", "#065f46"][employee.employee_id % 5],
+    profilePictureUrl: employee.profile_picture_url ?? undefined,
   };
 }
 
@@ -279,9 +281,22 @@ function Avatar({ emp, size = 32 }: { emp: Employee; size?: number }) {
         background: emp.avatarColor + "22",
         color: emp.avatarColor,
         border: `1.5px solid ${emp.avatarColor}44`,
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "50%"
       }}
     >
-      {emp.initials}
+      {emp.profilePictureUrl ? (
+        <img
+          src={`http://localhost:8000${emp.profilePictureUrl}`}
+          alt={emp.name}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        emp.initials
+      )}
     </div>
   );
 }

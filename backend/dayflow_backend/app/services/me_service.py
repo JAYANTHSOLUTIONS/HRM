@@ -55,7 +55,7 @@ def build_profile_out(emp: Employee, email: str | None = None) -> dict:
         "address": emp.address,
         "date_of_birth": emp.date_of_birth,
         "gender": emp.gender,
-        "profile_picture_url": emp.profile_picture_url,
+        "profile_picture_url": f"/api/v1/employees/{emp.employee_id}/profile-picture/raw" if emp.profile_picture_url else None,
         "department_name": emp.department.department_name if emp.department else None,
         "designation_title": emp.designation.title if emp.designation else None,
         "manager_name": emp.manager.full_name if emp.manager else None,

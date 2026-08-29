@@ -1340,11 +1340,38 @@ function ProfilePage() {
     <div className="df-page">
       {/* Upper Unified Profile Card */}
       <div className="df-card mb-4 d-flex align-items-center gap-4 flex-row">
-        <div className="df-avatar" style={{ width: 80, height: 80, fontSize: 26, background: 'var(--df-blue)', color: '#fff' }}>
+        <div 
+          className="df-avatar position-relative" 
+          style={{ width: 80, height: 80, fontSize: 26, background: 'var(--df-blue)', color: '#fff', cursor: 'pointer', overflow: 'hidden', borderRadius: '50%' }}
+          onClick={() => document.getElementById('profile-avatar-input').click()}
+          title="Click to change profile picture"
+        >
           {profile?.profile_picture_url
-            ? <img src={`http://localhost:8000${profile.profile_picture_url}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            ? <img src={`http://localhost:8000${profile.profile_picture_url}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span>{(profile?.full_name || 'U').slice(0, 2).toUpperCase()}</span>
           }
+          <div 
+            className="position-absolute bottom-0 start-0 w-100 text-center py-1" 
+            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, pointerEvents: 'none' }}
+          >
+            Edit
+          </div>
+          <input
+            id="profile-avatar-input"
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              try {
+                await meApi.uploadProfilePicture(profile.employee_id, file);
+                load();
+              } catch (err) {
+                alert(err.message || 'Failed to upload profile picture.');
+              }
+            }}
+          />
         </div>
         <div>
           <h2 className="df-section-title mb-1" style={{ fontSize: 22 }}>{profile?.full_name}</h2>

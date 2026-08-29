@@ -15,6 +15,8 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 
 def _attach_email(employee):
     employee.email = employee.user.email if employee.user else None
+    if employee.profile_picture_url:
+        employee.profile_picture_url = f"/api/v1/employees/{employee.employee_id}/profile-picture/raw"
     return employee
 
 
