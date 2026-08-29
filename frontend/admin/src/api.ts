@@ -21,7 +21,7 @@ export interface ApiEmployee {
   designation: { designation_id: number; title: string } | null;
   employment_status: string;
   employment_type: string;
-  joining_date?: string;
+  joining_date: string;
   profile_picture_url?: string | null;
 }
 

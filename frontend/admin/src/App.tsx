@@ -320,8 +320,11 @@ function StatusBadge({ status }: { status: AttendanceStatus | TimeOffStatus }) {
   );
 }
 
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function formatDate(d: string | undefined | null) {
+  if (!d) return "-";
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return "-";
+  return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function timeToFraction(t: string) {

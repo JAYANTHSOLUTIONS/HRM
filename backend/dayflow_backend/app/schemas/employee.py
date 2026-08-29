@@ -21,6 +21,7 @@ class EmployeeListItem(BaseModel):
     designation: DesignationOut | None = None
     employment_status: str
     employment_type: str
+    joining_date: date
     profile_picture_url: str | None = None
 
 
