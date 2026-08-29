@@ -500,6 +500,8 @@ const NAV = [
 ]
 
 function Navbar({ page, onNav, profile, onLogout }) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
   return (
     <header className="df-navbar">
       <div className="df-logo">
@@ -513,18 +515,58 @@ function Navbar({ page, onNav, profile, onLogout }) {
           </button>
         ))}
       </nav>
-      <div className="ms-auto d-flex align-items-center gap-3">
-        <div className="d-flex align-items-center gap-2">
-          <div className="df-avatar" style={{ width: 30, height: 30, fontSize: 12, background: 'var(--df-blue)', color: '#fff' }}>
-            {(profile?.full_name || 'U').slice(0, 2).toUpperCase()}
+      <div className="ms-auto d-flex align-items-center gap-3 position-relative">
+        <div 
+          className="d-flex align-items-center gap-2" 
+          style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+        >
+          <div className="df-avatar" style={{ width: 30, height: 30, fontSize: 12, background: 'var(--df-blue)', color: '#fff', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>
+            {profile?.profile_picture_url ? (
+              <img src={`http://localhost:8000${profile.profile_picture_url}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              (profile?.full_name || 'U').slice(0, 2).toUpperCase()
+            )}
           </div>
           <div className="d-none d-md-block text-white" style={{ fontSize: 13, fontWeight: 600 }}>
             {profile?.full_name || 'Employee'}
           </div>
+          <i className="bi bi-chevron-down text-white-50" style={{ fontSize: 11 }} />
         </div>
-        <button className="df-nav-link text-white-50 p-1" onClick={onLogout} title="Sign out">
-          <i className="bi bi-box-arrow-right" style={{ fontSize: 16 }} />
-        </button>
+
+        {dropdownOpen && (
+          <>
+            <div 
+              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+              onClick={() => setDropdownOpen(false)}
+            />
+            <div 
+              className="df-card p-2 position-absolute end-0" 
+              style={{ 
+                top: '100%', 
+                width: 150, 
+                zIndex: 1000, 
+                background: '#fff', 
+                borderRadius: 8, 
+                border: '1px solid var(--df-border)', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                marginTop: 8
+              }}
+            >
+              <button 
+                className="w-100 text-start border-0 bg-transparent py-2 px-3 rounded-2 text-danger d-flex align-items-center gap-2" 
+                style={{ fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onLogout();
+                }}
+              >
+                <i className="bi bi-box-arrow-right" />
+                Sign Out
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </header>
   )

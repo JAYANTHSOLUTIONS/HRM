@@ -2280,7 +2280,9 @@ function AdminSalaryPage({ onNav }: { onNav: (p: Page, id?: number, defaultTab?:
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
-function Navbar({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
+function Navbar({ page, onNav, user, onLogout }: { page: Page; onNav: (p: Page) => void; user: ApiUser; onLogout: () => void }) {
+  const { employees } = useHRData();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const links: { key: Page; label: string; icon: string }[] = [
     { key: "dashboard", label: "Dashboard", icon: "bi-speedometer2" },
     { key: "employees", label: "Employees", icon: "bi-people-fill" },
@@ -2290,9 +2292,11 @@ function Navbar({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
   ];
 
   const activePage = page === "employee-detail" ? "employees" : page;
+  const emp = employees.find(e => e.id === user.employee_id);
+  const initialsText = user.full_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <nav className="df-navbar">
+    <nav className="df-navbar" style={{ position: "relative" }}>
       <a className="df-logo" onClick={() => onNav("dashboard")} style={{ cursor: "pointer" }}>
         <div className="df-logo-mark">D</div>
         <span>Dayflow</span>
@@ -2310,16 +2314,62 @@ function Navbar({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
           <i className="bi bi-bell" style={{ fontSize: 16 }} />
           <span style={{ position: "absolute", top: 10, right: 8, width: 7, height: 7, background: "#f59e0b", borderRadius: "50%", border: "1.5px solid var(--df-navy)" }} />
         </button>
-        <div className="d-flex align-items-center gap-2" style={{ cursor: "pointer", padding: "4px 8px", borderRadius: 8, transition: "background 0.15s" }}
+        
+        <div 
+          className="d-flex align-items-center gap-2" 
+          style={{ cursor: "pointer", padding: "4px 8px", borderRadius: 8, transition: "background 0.15s" }}
+          onClick={() => setDropdownOpen(!dropdownOpen)}
           onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans'", fontWeight: 700, fontSize: 12, color: "white" }}>SO</div>
+          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+        >
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans'", fontWeight: 700, fontSize: 12, color: "white", overflow: "hidden" }}>
+            {emp?.profilePictureUrl ? (
+              <img src={`http://localhost:8000${emp.profilePictureUrl}`} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              initialsText
+            )}
+          </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "white", lineHeight: 1.2 }}>Sandra Okafor</div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.2 }}>HR Admin</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "white", lineHeight: 1.2 }}>{user.full_name}</div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", lineHeight: 1.2 }}>{user.role}</div>
           </div>
           <i className="bi bi-chevron-down" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: 2 }} />
         </div>
+
+        {dropdownOpen && (
+          <>
+            <div 
+              style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+              onClick={() => setDropdownOpen(false)}
+            />
+            <div 
+              className="df-card p-2 position-absolute" 
+              style={{ 
+                top: "100%", 
+                right: 16, 
+                width: 150, 
+                zIndex: 1000, 
+                background: "#fff", 
+                borderRadius: 8, 
+                border: "1px solid var(--df-border)", 
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                marginTop: 8
+              }}
+            >
+              <button 
+                className="w-100 text-start border-0 bg-transparent py-2 px-3 rounded-2 text-danger d-flex align-items-center gap-2" 
+                style={{ fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onLogout();
+                }}
+              >
+                <i className="bi bi-box-arrow-right" />
+                Sign Out
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </nav>
   );
@@ -2443,7 +2493,7 @@ export default function App() {
   if (!session) return <LoginScreen onLogin={handleLogin} />;
   return <HRDataProvider token={session.token} onUnauthorized={handleUnauthorized}>
     <div style={{ minHeight: "100vh", background: "var(--df-surface)" }}>
-      <Navbar page={page} onNav={p => nav(p)} />
+      <Navbar page={page} onNav={p => nav(p)} user={session.user} onLogout={handleUnauthorized} />
       <DataStatus />
       <main>
         {page === "dashboard" && <Dashboard onNav={nav} />}
