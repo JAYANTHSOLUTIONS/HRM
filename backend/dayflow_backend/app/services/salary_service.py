@@ -30,6 +30,15 @@ def get_salary_history(db: Session, employee_id: int) -> list[SalaryStructure]:
     )
 
 
+def get_all_salaries(db: Session) -> list[SalaryStructure]:
+    return (
+        db.query(SalaryStructure)
+        .options(joinedload(SalaryStructure.components))
+        .filter(SalaryStructure.is_current.is_(True))
+        .all()
+    )
+
+
 def _resolve_components(monthly_wage: Decimal, components_in: list) -> list[dict]:
     resolved = []
     for c in components_in:

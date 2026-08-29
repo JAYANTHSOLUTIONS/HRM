@@ -24,6 +24,18 @@ def test_salary_requires_admin(client, seed):
     basic = next(c for c in body["components"] if c["name"] == "Basic Salary")
     assert float(basic["computed_amount"]) == 25000.0
 
+    # Employee views their own salary read-only via GET /api/v1/me/salary
+    me_resp = client.get("/api/v1/me/salary", headers=auth_header(seed["emp_user"]))
+    assert me_resp.status_code == 200
+    me_body = me_resp.json()
+    assert float(me_body["monthly_wage"]) == 50000.0
+    assert len(me_body["components"]) == 2
+
+    # Admin lists all salaries via GET /api/v1/salary
+    list_resp = client.get("/api/v1/salary", headers=auth_header(seed["admin_user"]))
+    assert list_resp.status_code == 200
+    assert len(list_resp.json()["items"]) >= 1
+
 
 def test_leave_approve_requires_pending(client, db_session, seed):
     from app.models.leave import LeaveRequest, LeaveBalance

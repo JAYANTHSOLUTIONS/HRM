@@ -23,7 +23,7 @@ from app.models.auth import Role, User
 from app.models.hr import Department, Designation, Employee
 from app.models.leave import LeaveType
 
-TEST_DB_URL = "sqlite:///:memory:"
+TEST_DB_URL = "sqlite:///file:testdb?mode=memory&cache=shared&uri=true"
 
 
 @pytest.fixture()
@@ -87,6 +87,11 @@ def seed(db_session):
     paid_leave = LeaveType(name="Paid Time Off", is_balance_tracked=True, requires_attachment=False, is_active=True)
     db_session.add(paid_leave)
     db_session.commit()
+
+    db_session.refresh(admin_user)
+    db_session.refresh(hr_user)
+    db_session.refresh(emp_user)
+    db_session.refresh(employee)
 
     return {
         "admin_user": admin_user, "hr_user": hr_user, "emp_user": emp_user,

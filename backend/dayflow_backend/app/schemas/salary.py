@@ -48,3 +48,7 @@ class SalaryStructureOut(BaseModel):
 
 class SalaryHistoryOut(BaseModel):
     items: list[SalaryStructureOut]
+
+
+class SalaryListOut(BaseModel):
+    items: list[SalaryStructureOut]

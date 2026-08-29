@@ -778,15 +778,19 @@ const INITIAL_RESUME_DATA: Record<number, ResumeDetails> = {
   }
 };
 
-function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }) {
+function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: number; onBack: () => void; initialTab?: EmployeeTab }) {
   const { employees, token } = useHRData();
-  const [tab, setTab] = useState<EmployeeTab>("resume");
+  const [tab, setTab] = useState<EmployeeTab>(initialTab);
   const emp = employees.find(e => e.id === empId) ?? employees[0];
   const [salary, setSalary] = useState<ApiSalary | null>(null);
 
   useEffect(() => {
     void api.salary(empId, token).then(setSalary).catch(() => setSalary(null));
   }, [empId, token]);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [empId, initialTab]);
 
   // Resume state mapping
   const [resumeMap, setResumeMap] = useState<Record<number, ResumeDetails>>(INITIAL_RESUME_DATA);
@@ -814,34 +818,61 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
 
   // Salary Info State
   const [monthWage, setMonthWage] = useState<number>(50000);
-  const [workingDaysWeek, setWorkingDaysWeek] = useState<number>(5);
-  const [breakTimeHours, setBreakTimeHours] = useState<number>(1);
+  
+  // Persist working days & break time in localStorage per employee
+  const [workingDaysWeek, setWorkingDaysWeek] = useState<number>(() => {
+    const saved = localStorage.getItem(`working_days_emp_${empId}`);
+    return saved ? Number(saved) : 5;
+  });
+  const [breakTimeHours, setBreakTimeHours] = useState<number>(() => {
+    const saved = localStorage.getItem(`break_time_emp_${empId}`);
+    return saved ? Number(saved) : 1;
+  });
+  
   const [pfPct, setPfPct] = useState<number>(12);
   const [profTaxVal, setProfTaxVal] = useState<number>(200);
 
   useEffect(() => {
+    const savedDays = localStorage.getItem(`working_days_emp_${empId}`);
+    setWorkingDaysWeek(savedDays ? Number(savedDays) : 5);
+    const savedBreak = localStorage.getItem(`break_time_emp_${empId}`);
+    setBreakTimeHours(savedBreak ? Number(savedBreak) : 1);
+  }, [empId]);
+
+  useEffect(() => {
     if (!salary) return;
     setMonthWage(Number(salary.monthly_wage));
+    
     const employeePf = salary.components.find(component => component.name.toLowerCase().includes("provident") || component.name.toLowerCase() === "pf");
-    if (employeePf?.percentage != null) setPfPct(Number(employeePf.percentage));
+    if (employeePf) {
+      const basic = Number(salary.monthly_wage) * 0.50;
+      if (basic > 0) {
+        setPfPct(Math.round((Number(employeePf.computed_amount) * 100 / basic) * 100) / 100);
+      }
+    }
+    
+    const profTax = salary.components.find(component => component.name.toLowerCase().includes("professional tax") || component.name.toLowerCase() === "pt");
+    if (profTax) {
+      setProfTaxVal(Number(profTax.fixed_amount ?? profTax.computed_amount));
+    }
   }, [salary]);
 
-  // Automatic Salary Calculations
+  // Automatic Salary Calculations based on image
   const yearlyWage = monthWage * 12;
   const basicVal = monthWage * 0.50;
   const basicPctStr = "50.00 %";
 
   const hraVal = basicVal * 0.50;
-  const hraPctStr = "50.00 %";
+  const hraPctStr = "50.00 % of Basic";
 
-  const stdVal = monthWage * (4167 / 50000);
-  const stdPctStr = "16.67 %";
+  const stdVal = monthWage * 0.15;
+  const stdPctStr = "15.00 %";
 
-  const perfVal = monthWage * (2082.50 / 50000);
-  const perfPctStr = "8.33 %";
+  const perfVal = basicVal * 0.0933;
+  const perfPctStr = "9.33 % of Basic";
 
-  const ltaVal = monthWage * (2082.50 / 50000);
-  const ltaPctStr = "8.33 %";
+  const ltaVal = basicVal * 0.0933;
+  const ltaPctStr = "9.33 % of Basic";
 
   const fixedVal = Math.max(0, monthWage - (basicVal + hraVal + stdVal + perfVal + ltaVal));
   const fixedPctVal = monthWage > 0 ? (fixedVal / monthWage) * 100 : 0;
@@ -851,6 +882,41 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
   const employerPfVal = basicVal * (pfPct / 100);
   const totalDeductionsVal = employeePfVal + profTaxVal;
   const netSalaryVal = monthWage - totalDeductionsVal;
+
+  const [savingSalary, setSavingSalary] = useState(false);
+  const [salaryFeedback, setSalaryFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  async function handleSaveSalary() {
+    setSavingSalary(true);
+    setSalaryFeedback(null);
+    try {
+      const todayIso = new Date().toISOString().split("T")[0];
+      const payload = {
+        monthly_wage: monthWage,
+        wage_type: "MONTHLY",
+        effective_from: salary?.effective_from || todayIso,
+        components: [
+          { name: "Basic Salary", type: "EARNING", calculation_type: "PERCENTAGE", percentage: 50 },
+          { name: "House Rent Allowance", type: "EARNING", calculation_type: "PERCENTAGE", percentage: 25 },
+          { name: "Standard Allowance", type: "EARNING", calculation_type: "PERCENTAGE", percentage: 15 },
+          { name: "Performance Bonus", type: "EARNING", calculation_type: "FIXED", fixed_amount: Math.round(perfVal * 100) / 100 },
+          { name: "Leave Travel Allowance", type: "EARNING", calculation_type: "FIXED", fixed_amount: Math.round(ltaVal * 100) / 100 },
+          { name: "Fixed Allowance", type: "EARNING", calculation_type: "FIXED", fixed_amount: Math.round(fixedVal * 100) / 100 },
+          { name: "Employee PF", type: "DEDUCTION", calculation_type: "FIXED", fixed_amount: Math.round(employeePfVal * 100) / 100 },
+          { name: "Employer PF", type: "EMPLOYER_CONTRIBUTION", calculation_type: "FIXED", fixed_amount: Math.round(employerPfVal * 100) / 100 },
+          { name: "Professional Tax", type: "DEDUCTION", calculation_type: "FIXED", fixed_amount: profTaxVal },
+        ],
+      };
+      const updated = await api.updateSalary(empId, payload, token);
+      setSalary(updated);
+      setSalaryFeedback({ type: "success", message: "Salary structure updated and saved successfully!" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update salary structure";
+      setSalaryFeedback({ type: "error", message: msg });
+    } finally {
+      setSavingSalary(false);
+    }
+  }
 
 
   function openAboutModal(field: "about" | "whatILove" | "interests" | "all" = "all") {
@@ -1158,6 +1224,12 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                 <span className="badge bg-primary px-2 py-1" style={{ fontSize: 11 }}>Admin Privilege Required</span>
               </div>
 
+              {salaryFeedback && (
+                <div className={`alert ${salaryFeedback.type === "success" ? "alert-success" : "alert-danger"} py-2 px-3 small mb-4`}>
+                  {salaryFeedback.message}
+                </div>
+              )}
+
               {/* Top Header Card: Month Wage, Yearly Wage, Working Days, Break Time */}
               <div className="df-salary-header-card">
                 <div className="row g-4 align-items-center">
@@ -1178,7 +1250,7 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <span style={{ fontWeight: 600, color: "var(--df-navy)" }}>Yearly wage</span>
                       <div className="df-salary-input-group">
                         <span className="df-salary-num-input text-end d-inline-block" style={{ background: "#f1f5f9" }}>
-                          {yearlyWage}
+                          {yearlyWage.toLocaleString("en-IN")}
                         </span>
                         <span className="text-muted" style={{ fontSize: 13 }}>/ Yearly</span>
                       </div>
@@ -1194,7 +1266,11 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                           className="df-salary-num-input"
                           style={{ width: 90 }}
                           value={workingDaysWeek}
-                          onChange={e => setWorkingDaysWeek(Number(e.target.value))}
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setWorkingDaysWeek(v);
+                            localStorage.setItem(`working_days_emp_${empId}`, String(v));
+                          }}
                         />
                       </div>
                     </div>
@@ -1206,16 +1282,20 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                           className="df-salary-num-input"
                           style={{ width: 90 }}
                           value={breakTimeHours}
-                          onChange={e => setBreakTimeHours(Number(e.target.value))}
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setBreakTimeHours(v);
+                            localStorage.setItem(`break_time_emp_${empId}`, String(v));
+                          }}
                         />
-                        <span className="text-muted" style={{ fontSize: 13 }}>/hrs</span>
+                        <span className="text-muted" style={{ fontSize: 13 }}>hr / day</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Main Two Column Layout */}
+              {/* Two Column Breakdown */}
               <div className="row g-4">
                 {/* Left Column: Salary Components */}
                 <div className="col-lg-7 col-md-12">
@@ -1227,7 +1307,7 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">Basic Salary</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{basicVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{basicVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{basicPctStr}</span>
                         </div>
                       </div>
@@ -1236,17 +1316,17 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       </div>
                     </div>
 
-                    {/* House Rent Allowance */}
+                    {/* HRA */}
                     <div className="df-salary-comp-item">
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">House Rent Allowance</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{hraVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{hraVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{hraPctStr}</span>
                         </div>
                       </div>
                       <div className="df-salary-comp-sub">
-                        HRA provided to employees 50% of the basic salary
+                        House Rent Allowance provided to employees
                       </div>
                     </div>
 
@@ -1255,12 +1335,12 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">Standard Allowance</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{stdVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{stdVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{stdPctStr}</span>
                         </div>
                       </div>
                       <div className="df-salary-comp-sub">
-                        A standard allowance is a predetermined, fixed amount provided to employee as part of their salary
+                        Standard allowance is a predictable, fixed amount provided to employee
                       </div>
                     </div>
 
@@ -1269,26 +1349,26 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">Performance Bonus</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{perfVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{perfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{perfPctStr}</span>
                         </div>
                       </div>
                       <div className="df-salary-comp-sub">
-                        Variable amount paid during payroll. The value defined by the company and calculated as a % of the basic salary
+                        Variable amount paid during payroll, depends on company performance
                       </div>
                     </div>
 
-                    {/* Leave Travel Allowance */}
+                    {/* LTA */}
                     <div className="df-salary-comp-item">
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">Leave Travel Allowance</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{ltaVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{ltaVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{ltaPctStr}</span>
                         </div>
                       </div>
                       <div className="df-salary-comp-sub">
-                        LTA is paid by the company to employees to cover their travel expenses. and calculated as a % of the basic salary
+                        LTA is paid by the company to employees to cover their travel expenses
                       </div>
                     </div>
 
@@ -1297,12 +1377,12 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <div className="df-salary-comp-header">
                         <span className="df-salary-comp-title">Fixed Allowance</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{fixedVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{fixedVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{fixedPctStr}</span>
                         </div>
                       </div>
                       <div className="df-salary-comp-sub">
-                        fixed allowance portion of wages is determined after calculating all salary components
+                        Fixed allowance portion of wages is determined after calculating all salary components
                       </div>
                     </div>
                   </div>
@@ -1317,9 +1397,9 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                     {/* Employee PF */}
                     <div className="df-salary-comp-item">
                       <div className="df-salary-comp-header">
-                        <span className="df-salary-comp-title">Employee</span>
+                        <span className="df-salary-comp-title">Employee Contribution</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{employeePfVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{employeePfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <input
                             type="number"
                             className="df-salary-num-input"
@@ -1338,9 +1418,9 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                     {/* Employer PF */}
                     <div className="df-salary-comp-item">
                       <div className="df-salary-comp-header">
-                        <span className="df-salary-comp-title">Employe'r</span>
+                        <span className="df-salary-comp-title">Employer Contribution</span>
                         <div className="d-flex align-items-center gap-2">
-                          <span className="df-salary-comp-val">{employerPfVal.toFixed(2)} ₹ / month</span>
+                          <span className="df-salary-comp-val">₹{employerPfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                           <span className="df-salary-comp-pct">{pfPct.toFixed(2)} %</span>
                         </div>
                       </div>
@@ -1385,13 +1465,32 @@ function EmployeeDetail({ empId, onBack }: { empId: number; onBack: () => void }
                       <span style={{ fontSize: 13, color: "#fca5a5" }}>Deductions (PF + Professional Tax)</span>
                       <span className="tabnum" style={{ fontWeight: 600, fontSize: 15, color: "#fca5a5" }}>−₹{totalDeductionsVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="d-flex justify-content-between align-items-center">
+                    <div className="d-flex justify-content-between align-items-center mb-4">
                       <div>
                         <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--df-text-sub)", display: "block" }}>Net Monthly Salary</span>
                         <span style={{ fontWeight: 800, fontSize: 20, color: "#4ade80" }} className="tabnum">₹{netSalaryVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                       </div>
                       <span className="badge bg-success bg-opacity-25 text-success border border-success px-3 py-2">Auto Calculated</span>
                     </div>
+
+                    <button
+                      className="df-btn-primary w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2"
+                      style={{ background: "#10b981", borderColor: "#10b981" }}
+                      disabled={savingSalary}
+                      onClick={handleSaveSalary}
+                    >
+                      {savingSalary ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-cloud-arrow-up-fill" />
+                          Save Salary Structure
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1866,6 +1965,212 @@ function TimeOff() {
   );
 }
 
+// ─── Payroll / Salary Page ───────────────────────────────────────────────────
+
+function AdminSalaryPage({ onNav }: { onNav: (p: Page, id?: number, defaultTab?: EmployeeTab) => void }) {
+  const { token, employees } = useHRData();
+  const [salariesMap, setSalariesMap] = useState<Record<number, ApiSalary>>({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    api.allSalaries(token)
+      .then(res => {
+        const map: Record<number, ApiSalary> = {};
+        if (res?.items) {
+          res.items.forEach(s => { map[s.employee_id] = s; });
+        }
+        setSalariesMap(map);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const filtered = employees.filter(e =>
+    e.name.toLowerCase().includes(search.toLowerCase()) ||
+    e.department.toLowerCase().includes(search.toLowerCase()) ||
+    e.role.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const configuredCount = Object.keys(salariesMap).length;
+  const totalMonthlyCost = Object.values(salariesMap).reduce((sum, s) => sum + Number(s.monthly_wage), 0);
+  const totalAnnualCost = totalMonthlyCost * 12;
+  const avgMonthlyWage = configuredCount > 0 ? totalMonthlyCost / configuredCount : 0;
+
+  return (
+    <div className="df-container py-4">
+      {/* Page Header */}
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h1 className="df-page-title mb-1" style={{ fontSize: 24, fontWeight: 700, color: "var(--df-navy)" }}>Payroll & Salary Management</h1>
+          <p className="df-page-sub mb-0" style={{ color: "var(--df-text-muted)", fontSize: 14 }}>
+            Overview of employee compensation, salary structures, and payroll control
+          </p>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-3 col-sm-6">
+          <div className="df-card p-3" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--df-text-muted)" }}>Total Monthly Payroll</span>
+              <div className="p-2 rounded-2" style={{ background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>
+                <i className="bi bi-cash-stack" style={{ fontSize: 18 }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--df-navy)" }} className="tabnum">
+              ₹{totalMonthlyCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--df-text-muted)", marginTop: 4 }}>Active configured structures</div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6">
+          <div className="df-card p-3" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--df-text-muted)" }}>Annual Payroll Budget</span>
+              <div className="p-2 rounded-2" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
+                <i className="bi bi-piggy-bank" style={{ fontSize: 18 }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--df-navy)" }} className="tabnum">
+              ₹{totalAnnualCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--df-text-muted)", marginTop: 4 }}>Annual total compensation</div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6">
+          <div className="df-card p-3" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--df-text-muted)" }}>Configured Employees</span>
+              <div className="p-2 rounded-2" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>
+                <i className="bi bi-people" style={{ fontSize: 18 }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--df-navy)" }}>
+              {configuredCount} / {employees.length}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--df-text-muted)", marginTop: 4 }}>Salary structures active</div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6">
+          <div className="df-card p-3" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--df-text-muted)" }}>Average Monthly Wage</span>
+              <div className="p-2 rounded-2" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
+                <i className="bi bi-graph-up-arrow" style={{ fontSize: 18 }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--df-navy)" }} className="tabnum">
+              ₹{avgMonthlyWage.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--df-text-muted)", marginTop: 4 }}>Avg per configured employee</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter / Search Bar */}
+      <div className="df-card p-3 mb-4" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+        <div className="row g-3 align-items-center">
+          <div className="col-md-6">
+            <div className="position-relative">
+              <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" />
+              <input
+                className="df-input w-100 ps-5"
+                placeholder="Search by employee name, role, or department..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Employee Payroll Table */}
+      <div className="df-card overflow-hidden" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+        <table className="df-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Department</th>
+              <th>Role</th>
+              <th>Wage Type</th>
+              <th className="tabnum">Monthly Wage</th>
+              <th className="tabnum">Yearly Wage</th>
+              <th>Status</th>
+              <th className="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8}>
+                  <div className="df-empty py-5 text-center">
+                    <i className="bi bi-inbox df-empty-icon mb-2" style={{ fontSize: 32 }} />
+                    <p className="df-empty-title fw-bold mb-1">No employees found</p>
+                    <p className="df-empty-sub text-muted">No employee matches your search criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filtered.map(emp => {
+                const s = salariesMap[emp.id];
+                const monthlyWage = s ? Number(s.monthly_wage) : 50000;
+                const yearlyWage = monthlyWage * 12;
+                return (
+                  <tr key={emp.id}>
+                    <td>
+                      <div className="d-flex align-items-center gap-2">
+                        <Avatar emp={emp} size={32} />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--df-navy)" }}>{emp.name}</div>
+                          <div style={{ fontSize: 11, color: "var(--df-text-muted)" }}>{emp.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 13, fontWeight: 500 }}>{emp.department}</td>
+                    <td style={{ fontSize: 13, color: "var(--df-text-muted)" }}>{emp.role}</td>
+                    <td>
+                      <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: 11 }}>
+                        {s ? s.wage_type : "MONTHLY"}
+                      </span>
+                    </td>
+                    <td className="tabnum fw-bold text-dark" style={{ fontSize: 14 }}>
+                      ₹{monthlyWage.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="tabnum text-muted" style={{ fontSize: 13 }}>
+                      ₹{yearlyWage.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td>
+                      <span className={`badge ${s ? "bg-success-subtle text-success border border-success-subtle" : "bg-secondary-subtle text-secondary border border-secondary-subtle"} px-2 py-1`} style={{ fontSize: 11 }}>
+                        {s ? "Configured" : "Default"}
+                      </span>
+                    </td>
+                    <td className="text-end">
+                      <button
+                        className="df-btn-secondary py-1 px-3"
+                        style={{ fontSize: 12 }}
+                        onClick={() => onNav("employee-detail", emp.id, "salary")}
+                      >
+                        <i className="bi bi-pencil-square me-1" />
+                        Manage Salary
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
 function Navbar({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
@@ -1874,6 +2179,7 @@ function Navbar({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
     { key: "employees", label: "Employees", icon: "bi-people-fill" },
     { key: "attendance", label: "Attendance", icon: "bi-clock-fill" },
     { key: "timeoff", label: "Time Off", icon: "bi-calendar-check-fill" },
+    { key: "salary", label: "Payroll", icon: "bi-cash-stack" },
   ];
 
   const activePage = page === "employee-detail" ? "employees" : page;
@@ -1999,6 +2305,7 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [selectedEmpId, setSelectedEmpId] = useState<number>(1);
+  const [initialDetailTab, setInitialDetailTab] = useState<EmployeeTab>("resume");
   const [session, setSession] = useState<{ token: string; refreshToken: string; user: ApiUser } | null>(() => {
     const stored = localStorage.getItem("dayflow_session");
     return stored ? JSON.parse(stored) : null;
@@ -2013,8 +2320,11 @@ export default function App() {
     setSession(nextSession);
   }
 
-  function nav(p: Page, id?: number) {
-    if (p === "employee-detail" && id) setSelectedEmpId(id);
+  function nav(p: Page, id?: number, defaultTab: EmployeeTab = "resume") {
+    if (p === "employee-detail" && id) {
+      setSelectedEmpId(id);
+      setInitialDetailTab(defaultTab);
+    }
     setPage(p);
   }
 
@@ -2031,9 +2341,10 @@ export default function App() {
       <main>
         {page === "dashboard" && <Dashboard onNav={nav} />}
         {page === "employees" && <EmployeeList onNav={nav} />}
-        {page === "employee-detail" && <EmployeeDetail empId={selectedEmpId} onBack={() => setPage("employees")} />}
+        {page === "employee-detail" && <EmployeeDetail empId={selectedEmpId} onBack={() => setPage("employees")} initialTab={initialDetailTab} />}
         {page === "attendance" && <Attendance />}
         {page === "timeoff" && <TimeOff />}
+        {page === "salary" && <AdminSalaryPage onNav={nav} />}
       </main>
     </div>
   </HRDataProvider>;

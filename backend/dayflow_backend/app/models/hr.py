@@ -36,7 +36,7 @@ class Designation(Base, TimestampMixin, UpdatedAtMixin):
 class Employee(Base, TimestampMixin, UpdatedAtMixin):
     __tablename__ = "employees"
 
-    employee_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), unique=True)
     employee_code: Mapped[str] = mapped_column(String(30), unique=True)
     first_name: Mapped[str] = mapped_column(String(100))
@@ -68,7 +68,7 @@ class Employee(Base, TimestampMixin, UpdatedAtMixin):
 class EmployeeDocument(Base, TimestampMixin):
     __tablename__ = "employee_documents"
 
-    document_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    document_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("employees.employee_id"))
     document_type: Mapped[str] = mapped_column(Enum(*DOCUMENT_TYPE, name="document_type_enum"))
     original_filename: Mapped[str] = mapped_column(String(255))

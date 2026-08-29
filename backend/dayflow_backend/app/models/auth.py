@@ -6,7 +6,7 @@ Do NOT add signup/login business logic here.
 from __future__ import annotations
 from datetime import datetime
 
-from sqlalchemy import String, Boolean, SmallInteger, TIMESTAMP, ForeignKey
+from sqlalchemy import String, Boolean, SmallInteger, TIMESTAMP, ForeignKey, BigInteger, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -16,7 +16,7 @@ from app.models.base import TimestampMixin, UpdatedAtMixin
 class Role(Base):
     __tablename__ = "roles"
 
-    role_id: Mapped[int] = mapped_column(primary_key=True)
+    role_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     role_name: Mapped[str] = mapped_column(String(30), unique=True)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
@@ -26,7 +26,7 @@ class Role(Base):
 class User(Base, TimestampMixin, UpdatedAtMixin):
     __tablename__ = "users"
 
-    user_id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_code: Mapped[str] = mapped_column(String(30), unique=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))

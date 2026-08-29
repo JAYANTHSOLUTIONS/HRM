@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 
-from sqlalchemy import String, TIMESTAMP, ForeignKey, BigInteger, JSON
+from sqlalchemy import String, TIMESTAMP, ForeignKey, BigInteger, JSON, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -10,7 +10,7 @@ from app.core.database import Base
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    audit_log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    audit_log_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     actor_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
     action: Mapped[str] = mapped_column(String(60))
     target_entity: Mapped[str] = mapped_column(String(60))

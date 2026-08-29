@@ -976,8 +976,11 @@ function LeaveRequestModal({ leaveTypes, onClose, onSuccess }) {
 }
 
 // ─── Profile Page (With Document Upload) ──────────────────────────────────────
+// ─── Profile Page (With Document Upload) ──────────────────────────────────────
 function ProfilePage() {
   const [profile, setProfile] = useState(null)
+  const [salary, setSalary] = useState(null)
+  const [tab, setTab] = useState('resume') // 'resume' | 'private' | 'salary' | 'security'
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
@@ -992,8 +995,22 @@ function ProfilePage() {
 
   const load = useCallback(() => {
     setLoading(true)
-    meApi.getProfile().then(p => { setProfile(p); setForm({ phone: p.phone || '', address: p.address || '', gender: p.gender || '', date_of_birth: p.date_of_birth || '' }) })
-      .catch(e => setError(e.message)).finally(() => setLoading(false))
+    Promise.all([
+      meApi.getProfile(),
+      meApi.getSalary().catch(() => null)
+    ])
+      .then(([p, s]) => {
+        setProfile(p)
+        setSalary(s)
+        setForm({
+          phone: p.phone || '',
+          address: p.address || '',
+          gender: p.gender || '',
+          date_of_birth: p.date_of_birth || ''
+        })
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -1033,135 +1050,465 @@ function ProfilePage() {
 
   return (
     <div className="df-page">
-      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div><h1 className="df-section-title">My Profile</h1></div>
-        {!editing && <button className="df-btn-secondary" onClick={() => setEditing(true)}><i className="bi bi-pencil me-1" />Edit Profile</button>}
-      </div>
-
-      <Alert msg={error} onClose={() => setError('')} />
-      {success && <div className="alert alert-success py-2 px-3 small">{success}</div>}
-
-      <div className="row g-4">
-        {/* Left: avatar + job info */}
-        <div className="col-md-4">
-          <div className="df-card text-center">
-            <div className="df-avatar mx-auto mb-3" style={{ width: 72, height: 72, fontSize: 24, background: 'var(--df-blue)', color: '#fff' }}>
-              {profile?.profile_picture_url
-                ? <img src={`http://localhost:8000${profile.profile_picture_url}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                : <span>{(profile?.full_name || 'U').slice(0, 2).toUpperCase()}</span>
-              }
-            </div>
-            <h3 className="df-section-title fs-5 mb-1">{profile?.full_name}</h3>
-            <p className="df-section-sub mb-1">{profile?.designation_title}</p>
-            <p className="df-section-sub mb-3">{profile?.department_name}</p>
-            <div>
-              <Badge status={profile?.employment_status} />
-            </div>
-          </div>
-
-          <div className="df-card mt-3">
-            <h3 className="df-section-title fs-6 mb-3"><i className="bi bi-info-circle me-2 text-primary" />Job Details</h3>
-            {fields.map(f => (
-              <div key={f.label} className="d-flex align-items-start gap-2 mb-3">
-                <i className={`bi ${f.icon} text-primary fs-6`} />
-                <div>
-                  <div className="df-stat-label">{f.label}</div>
-                  <div className="fw-semibold text-dark">{f.value || '—'}</div>
-                </div>
-              </div>
-            ))}
+      {/* Upper Unified Profile Card */}
+      <div className="df-card mb-4 d-flex align-items-center gap-4 flex-row">
+        <div className="df-avatar" style={{ width: 80, height: 80, fontSize: 26, background: 'var(--df-blue)', color: '#fff' }}>
+          {profile?.profile_picture_url
+            ? <img src={`http://localhost:8000${profile.profile_picture_url}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : <span>{(profile?.full_name || 'U').slice(0, 2).toUpperCase()}</span>
+          }
+        </div>
+        <div>
+          <h2 className="df-section-title mb-1" style={{ fontSize: 22 }}>{profile?.full_name}</h2>
+          <p className="df-section-sub mb-2">{profile?.designation_title} · {profile?.department_name}</p>
+          <div className="d-flex align-items-center gap-2">
+            <Badge status={profile?.employment_status} />
+            <span className="text-muted" style={{ fontSize: 12 }}>Joined on {fmtDate(profile?.joining_date)}</span>
           </div>
         </div>
+      </div>
 
-        {/* Right: editable personal info & documents */}
-        <div className="col-md-8">
-          <div className="df-card mb-4">
-            <h3 className="df-section-title fs-6 mb-4"><i className="bi bi-person-fill me-2 text-primary" />Personal Information</h3>
-            {editing ? (
-              <form onSubmit={handleSave}>
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="df-stat-label mb-1">Phone Number</label>
-                    <input className="df-input w-100" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" />
-                  </div>
-                  <div className="col-12">
-                    <label className="df-stat-label mb-1">Address</label>
-                    <textarea className="df-input w-100" rows={3} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street, City, State, Country" />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="df-stat-label mb-1">Gender</label>
-                    <select className="df-input w-100" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
-                      <option value="">Prefer not to say</option>
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
-                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="df-stat-label mb-1">Date of Birth</label>
-                    <input className="df-input w-100" type="date" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} />
-                  </div>
-                </div>
-                <div className="d-flex gap-2 mt-4">
-                  <button type="submit" className="df-btn-primary" disabled={saving}>
-                    {saving ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</> : <><i className="bi bi-check-lg me-1" />Save Changes</>}
-                  </button>
-                  <button type="button" className="df-btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <div className="row g-3">
+      {/* Tabs list */}
+      <div className="df-tabs mb-4">
+        {[
+          { id: 'resume', label: 'Resume', icon: 'bi-person-lines-fill' },
+          { id: 'private', label: 'Private Info', icon: 'bi-shield-lock-fill' },
+          { id: 'salary', label: 'Salary Info', icon: 'bi-cash-stack' },
+          { id: 'security', label: 'Security', icon: 'bi-key-fill' },
+        ].map(t => (
+          <button key={t.id} className={`df-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <i className={`bi ${t.icon}`} style={{ fontSize: 13 }} /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <Alert msg={error} onClose={() => setError('')} />}
+      {success && <div className="alert alert-success py-2 px-3 small mb-4">{success}</div>}
+
+      {/* Tab 1: Resume */}
+      {tab === 'resume' && (
+        <div className="row g-4">
+          <div className="col-lg-7 col-md-12">
+            <div className="df-card mb-4">
+              <h3 className="df-section-title fs-6 mb-3">About</h3>
+              <p className="text-muted">
+                Professional software engineering specialist dedicated to designing, building, and launching secure, scalable software systems. Experienced in full stack web development, RESTful APIs, database optimizations, and agentic workflows.
+              </p>
+              <h3 className="df-section-title fs-6 mt-4 mb-3">What I love about my job</h3>
+              <p className="text-muted">
+                Tackling complex engineering challenges, architecting robust backend systems, and collaborating with cross-functional teams to build products that deliver high user impact.
+              </p>
+              <h3 className="df-section-title fs-6 mt-4 mb-3">My interests and hobbies</h3>
+              <p className="text-muted">
+                Exploring cutting-edge AI agent systems, contributing to open source projects, cycling, and reading technical blogs.
+              </p>
+            </div>
+          </div>
+          <div className="col-lg-5 col-md-12">
+            <div className="df-card mb-4">
+              <h3 className="df-section-title fs-6 mb-3">Skills</h3>
+              <div className="d-flex flex-wrap gap-2 mb-4">
+                {['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'FastAPI', 'PostgreSQL', 'Docker', 'Git', 'AWS'].map(skill => (
+                  <span key={skill} className="badge bg-light text-dark border px-2.5 py-1.5" style={{ fontSize: 12 }}>{skill}</span>
+                ))}
+              </div>
+              <h3 className="df-section-title fs-6 mb-3">Certifications</h3>
+              <div className="d-flex flex-column gap-3">
                 {[
-                  { label: 'Phone', value: profile?.phone, icon: 'bi-telephone-fill' },
-                  { label: 'Address', value: profile?.address, icon: 'bi-geo-alt-fill' },
-                  { label: 'Gender', value: profile?.gender, icon: 'bi-person-fill' },
-                  { label: 'Date of Birth', value: fmtDate(profile?.date_of_birth), icon: 'bi-cake-fill' },
-                ].map(f => (
-                  <div key={f.label} className="col-md-6">
-                    <div className="p-3 border rounded-3 bg-light">
-                      <div className="df-stat-label mb-1"><i className={`bi ${f.icon} me-1`} />{f.label}</div>
-                      <div className="fw-bold text-dark">{f.value || <span className="text-muted fw-normal">Not set</span>}</div>
-                    </div>
+                  { title: 'Google Certified Professional Cloud Architect', issuer: 'Google Cloud', date: 'Feb 2025' },
+                  { title: 'AWS Certified Solutions Architect', issuer: 'Amazon Web Services', date: 'Sep 2024' },
+                ].map(cert => (
+                  <div key={cert.title} className="p-3 border rounded bg-light">
+                    <div className="fw-semibold text-dark" style={{ fontSize: 13.5 }}>{cert.title}</div>
+                    <small className="text-muted">{cert.issuer} · {cert.date}</small>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Employee Documents Manager */}
-          <div className="df-card">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h3 className="df-section-title fs-6 mb-0"><i className="bi bi-file-earmark-pdf me-2 text-primary" />My Documents</h3>
-              <label className="df-btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
-                <i className="bi bi-upload me-1" />{uploadingDoc ? 'Uploading...' : 'Upload Document'}
-                <input type="file" onChange={handleDocUpload} className="d-none" disabled={uploadingDoc} />
-              </label>
-            </div>
-            <div className="df-table-wrap">
-              <table className="df-table">
-                <thead>
-                  <tr><th>Document Name</th><th>Size</th><th>Date</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                  {docs.map(d => (
-                    <tr key={d.id}>
-                      <td><i className="bi bi-file-earmark-pdf-fill text-danger me-2" /><strong>{d.name}</strong></td>
-                      <td className="df-stat-sub">{d.size}</td>
-                      <td className="df-stat-sub">{d.date}</td>
-                      <td>
-                        <button className="df-btn-secondary py-1 px-2 fs-7" onClick={() => alert(`Viewing document ${d.name}`)}>
-                          <i className="bi bi-eye" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Tab 2: Private Info */}
+      {tab === 'private' && (
+        <div className="row g-4">
+          <div className="col-md-4 d-flex flex-column gap-4">
+            <div className="df-card">
+              <h3 className="df-section-title fs-6 mb-3"><i className="bi bi-info-circle me-2 text-primary" />Job Details</h3>
+              {fields.map(f => (
+                <div key={f.label} className="d-flex align-items-start gap-2 mb-3">
+                  <i className={`bi ${f.icon} text-primary fs-6`} />
+                  <div>
+                    <div className="df-stat-label">{f.label}</div>
+                    <div className="fw-semibold text-dark">{f.value || '—'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="df-card">
+              <h3 className="df-section-title fs-6 mb-3"><i className="bi bi-bank me-2 text-primary" />Bank Details</h3>
+              {[
+                { label: 'Bank Name', value: 'Chase Bank', icon: 'bi-wallet-fill' },
+                { label: 'Account Number', value: '••••••••3421', icon: 'bi-card-list' },
+                { label: 'Bank State', value: 'New York', icon: 'bi-geo-alt-fill' },
+                { label: 'IFSC Code / Routing', value: 'CHASUS33XX', icon: 'bi-shield-check' },
+                { label: 'PAN No / Tax ID', value: '•••-••-8812', icon: 'bi-file-person' },
+                { label: 'Tax Code', value: 'TX-NY-09', icon: 'bi-tag-fill' },
+              ].map(b => (
+                <div key={b.label} className="d-flex align-items-start gap-2 mb-3">
+                  <i className={`bi ${b.icon} text-primary fs-6`} />
+                  <div>
+                    <div className="df-stat-label">{b.label}</div>
+                    <div className="fw-semibold text-dark">{b.value || '—'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="col-md-8 d-flex flex-column gap-4">
+            <div className="df-card">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h3 className="df-section-title fs-6 mb-0"><i className="bi bi-person-fill me-2 text-primary" />Personal Information</h3>
+                {!editing && (
+                  <button className="df-btn-secondary btn-sm" onClick={() => setEditing(true)}>
+                    <i className="bi bi-pencil me-1" />Edit Profile
+                  </button>
+                )}
+              </div>
+              {editing ? (
+                <form onSubmit={handleSave}>
+                  <div className="row g-3">
+                    <div className="col-12">
+                      <label className="df-stat-label mb-1">Phone Number</label>
+                      <input className="df-input w-100" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" />
+                    </div>
+                    <div className="col-12">
+                      <label className="df-stat-label mb-1">Address</label>
+                      <textarea className="df-input w-100" rows={3} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street, City, State, Country" />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="df-stat-label mb-1">Gender</label>
+                      <select className="df-input w-100" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
+                        <option value="">Prefer not to say</option>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                        <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="df-stat-label mb-1">Date of Birth</label>
+                      <input className="df-input w-100" type="date" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="d-flex gap-2 mt-4">
+                    <button type="submit" className="df-btn-primary" disabled={saving}>
+                      {saving ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</> : <><i className="bi bi-check-lg me-1" />Save Changes</>}
+                    </button>
+                    <button type="button" className="df-btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+                  </div>
+                </form>
+              ) : (
+                <div className="row g-3">
+                  {[
+                    { label: 'Phone', value: profile?.phone, icon: 'bi-telephone-fill' },
+                    { label: 'Address', value: profile?.address, icon: 'bi-geo-alt-fill' },
+                    { label: 'Gender', value: profile?.gender, icon: 'bi-person-fill' },
+                    { label: 'Date of Birth', value: fmtDate(profile?.date_of_birth), icon: 'bi-cake-fill' },
+                  ].map(f => (
+                    <div key={f.label} className="col-md-6">
+                      <div className="p-3 border rounded-3 bg-light">
+                        <div className="df-stat-label mb-1"><i className={`bi ${f.icon} me-1`} />{f.label}</div>
+                        <div className="fw-bold text-dark">{f.value || <span className="text-muted fw-normal">Not set</span>}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="df-card">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h3 className="df-section-title fs-6 mb-0"><i className="bi bi-file-earmark-pdf me-2 text-primary" />My Documents</h3>
+                <label className="df-btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                  <i className="bi bi-upload me-1" />{uploadingDoc ? 'Uploading...' : 'Upload Document'}
+                  <input type="file" onChange={handleDocUpload} className="d-none" disabled={uploadingDoc} />
+                </label>
+              </div>
+              <div className="df-table-wrap">
+                <table className="df-table">
+                  <thead>
+                    <tr><th>Document Name</th><th>Size</th><th>Date</th><th>Action</th></tr>
+                  </thead>
+                  <tbody>
+                    {docs.map(d => (
+                      <tr key={d.id}>
+                        <td><i className="bi bi-file-earmark-pdf-fill text-danger me-2" /><strong>{d.name}</strong></td>
+                        <td className="df-stat-sub">{d.size}</td>
+                        <td className="df-stat-sub">{d.date}</td>
+                        <td>
+                          <button className="df-btn-secondary py-1 px-2 fs-7" onClick={() => alert(`Viewing document ${d.name}`)}>
+                            <i className="bi bi-eye" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Salary Info */}
+      {tab === 'salary' && (
+        <div>
+          <div className="alert alert-info py-2 px-3 mb-4 d-flex align-items-center justify-content-between">
+            <div className="d-flex align-items-center gap-2">
+              <i className="bi bi-lock-fill text-primary" style={{ fontSize: 18 }} />
+              <div>
+                <span className="fw-semibold" style={{ fontSize: 13.5 }}>Read-Only View</span>
+                <span className="text-muted ms-2" style={{ fontSize: 12.5 }}>Payroll data is read-only for employees.</span>
+              </div>
+            </div>
+            <span className="badge bg-secondary-subtle text-secondary border px-2 py-1" style={{ fontSize: 11 }}>Read Only</span>
+          </div>
+
+          {!salary ? (
+            <div className="df-empty">
+              <i className="bi bi-currency-dollar df-empty-icon" />
+              <p className="df-empty-title">No salary structure configured yet.</p>
+              <p className="df-empty-sub text-muted">Please contact your HR administrator.</p>
+            </div>
+          ) : (
+            (() => {
+              const m_wage = Number(salary.monthly_wage);
+              const y_wage = m_wage * 12;
+              
+              const basicVal = m_wage * 0.50;
+              const hraVal = basicVal * 0.50;
+              const stdVal = m_wage * 0.15;
+              const perfVal = basicVal * 0.0933;
+              const ltaVal = basicVal * 0.0933;
+              const fixedVal = Math.max(0, m_wage - (basicVal + hraVal + stdVal + perfVal + ltaVal));
+              
+              const empPfComponent = salary.components.find(c => c.name.toLowerCase().includes("provident") || c.name.toLowerCase() === "pf");
+              const pfRate = empPfComponent ? Math.round((Number(empPfComponent.computed_amount) * 100 / basicVal) * 100) / 100 : 12;
+              const employeePfVal = basicVal * (pfRate / 100);
+              const employerPfVal = basicVal * (pfRate / 100);
+              
+              const profTaxComponent = salary.components.find(c => c.name.toLowerCase().includes("professional tax") || c.name.toLowerCase() === "pt");
+              const profTaxVal = profTaxComponent ? Number(profTaxComponent.fixed_amount ?? profTaxComponent.computed_amount) : 200;
+              
+              const totalDeductionsVal = employeePfVal + profTaxVal;
+              const netSalaryVal = m_wage - totalDeductionsVal;
+              
+              const workingDays = localStorage.getItem(`working_days_emp_${profile?.employee_id}`) || '5';
+              const breakHours = localStorage.getItem(`break_time_emp_${profile?.employee_id}`) || '1';
+
+              return (
+                <div>
+                  {/* Top Header Card */}
+                  <div className="df-card mb-4" style={{ background: '#fff', border: '1px solid var(--df-border)' }}>
+                    <div className="row g-4 align-items-center">
+                      <div className="col-md-6 border-end">
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                          <span className="fw-semibold text-dark">Monthly Wage</span>
+                          <span className="fw-bold fs-5 text-primary">₹{m_wage.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="fw-semibold text-dark">Yearly wage</span>
+                          <span className="fw-bold fs-5 text-secondary">₹{y_wage.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+
+                      <div className="col-md-6 ps-md-4">
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                          <span className="fw-semibold text-dark">No of working days in a week:</span>
+                          <span className="fw-bold text-dark fs-5">{workingDays}</span>
+                        </div>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <span className="fw-semibold text-dark">Break Time:</span>
+                          <span className="fw-bold text-dark fs-5">{breakHours} hr/day</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Two Column Layout */}
+                  <div className="row g-4">
+                    {/* Left: Components */}
+                    <div className="col-lg-7 col-md-12">
+                      <div className="df-card h-100">
+                        <h3 className="df-section-title fs-6 mb-4">Salary Components</h3>
+
+                        {/* Basic Salary */}
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Basic Salary</div>
+                            <small className="text-muted">Active Basic salary from company cost, computed based on monthly wages</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{basicVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">50.00 %</small>
+                          </div>
+                        </div>
+
+                        {/* HRA */}
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">House Rent Allowance</div>
+                            <small className="text-muted">HRA provided to employees, 50% of the basic salary (25% of monthly wage)</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{hraVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">50.00 % of Basic</small>
+                          </div>
+                        </div>
+
+                        {/* Standard Allowance */}
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Standard Allowance</div>
+                            <small className="text-muted">Standard allowance is a predictable, fixed amount provided to employee, 15% of their salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{stdVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">15.00 %</small>
+                          </div>
+                        </div>
+
+                        {/* Performance Bonus */}
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Performance Bonus</div>
+                            <small className="text-muted">Variable amount paid during payroll, calculated as 9.33% of basic salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{perfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">9.33 % of Basic</small>
+                          </div>
+                        </div>
+
+                        {/* LTA */}
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Leave Travel Allowance</div>
+                            <small className="text-muted">LTA paid by company to cover travel expenses, calculated as 9.33% of basic salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{ltaVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">9.33 % of Basic</small>
+                          </div>
+                        </div>
+
+                        {/* Fixed Allowance */}
+                        <div className="py-2 d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Fixed Allowance</div>
+                            <small className="text-muted">Fixed allowance portion of wages is determined after calculating all other components</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{fixedVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">{((fixedVal / m_wage) * 100).toFixed(2)} %</small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: PF & Tax */}
+                    <div className="col-lg-5 col-md-12 d-flex flex-column gap-4">
+                      <div className="df-card">
+                        <h3 className="df-section-title fs-6 mb-4">Provident Fund (PF) Contribution</h3>
+                        
+                        <div className="py-2 border-bottom d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Employee Contribution</div>
+                            <small className="text-muted">PF is calculated based on the basic salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{employeePfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">{pfRate.toFixed(2)} %</small>
+                          </div>
+                        </div>
+
+                        <div className="py-2 d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Employer Contribution</div>
+                            <small className="text-muted">PF is calculated based on the basic salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-dark">₹{employerPfVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                            <small className="badge bg-light text-muted border">{pfRate.toFixed(2)} %</small>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="df-card">
+                        <h3 className="df-section-title fs-6 mb-4">Tax Deductions</h3>
+                        
+                        <div className="py-2 d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="fw-semibold text-dark">Professional Tax</div>
+                            <small className="text-muted">Professional Tax deducted from the Gross salary</small>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-danger">−₹{profTaxVal.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Net Take-Home Pay */}
+                      <div className="p-4 rounded-3 text-white" style={{ background: 'var(--df-navy)' }}>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <span className="text-white-50">Monthly Gross Wage</span>
+                          <span className="fw-semibold">₹{m_wage.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center mb-3 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                          <span style={{ color: '#fca5a5' }}>Deductions (PF + Professional Tax)</span>
+                          <span className="fw-semibold" style={{ color: '#fca5a5' }}>−₹{totalDeductionsVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div>
+                            <div className="text-white-50" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Monthly Salary</div>
+                            <div className="fw-bold fs-3 text-success">₹{netSalaryVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                          </div>
+                          <i className="bi bi-wallet-fill display-5 text-white-50" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </div>
+      )}
+
+      {/* Tab 4: Security */}
+      {tab === 'security' && (
+        <div className="df-card" style={{ maxWidth: 500 }}>
+          <h3 className="df-section-title fs-6 mb-4"><i className="bi bi-key-fill me-2 text-primary" />Change Password</h3>
+          <form onSubmit={e => { e.preventDefault(); alert('Password changes are restricted in this demo.') }}>
+            <div className="mb-3">
+              <label className="df-stat-label mb-1">Current Password</label>
+              <input className="df-input w-100" type="password" required />
+            </div>
+            <div className="mb-3">
+              <label className="df-stat-label mb-1">New Password</label>
+              <input className="df-input w-100" type="password" required />
+            </div>
+            <div className="mb-4">
+              <label className="df-stat-label mb-1">Confirm New Password</label>
+              <input className="df-input w-100" type="password" required />
+            </div>
+            <button type="submit" className="df-btn-primary"><i className="bi bi-shield-lock-fill me-1" />Update Password</button>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

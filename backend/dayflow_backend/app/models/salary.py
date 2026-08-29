@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Numeric
+    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Numeric, Integer
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,7 +17,7 @@ CALCULATION_TYPE = ("FIXED", "PERCENTAGE")
 class SalaryStructure(Base):
     __tablename__ = "salary_structures"
 
-    salary_structure_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    salary_structure_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("employees.employee_id"))
     monthly_wage: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     annual_wage: Mapped[Decimal] = mapped_column(Numeric(14, 2))
@@ -36,7 +36,7 @@ class SalaryStructure(Base):
 class SalaryComponent(Base):
     __tablename__ = "salary_components"
 
-    salary_component_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    salary_component_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     salary_structure_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("salary_structures.salary_structure_id"))
     component_name: Mapped[str] = mapped_column(String(100))
     component_type: Mapped[str] = mapped_column(Enum(*COMPONENT_TYPE, name="component_type_enum"))

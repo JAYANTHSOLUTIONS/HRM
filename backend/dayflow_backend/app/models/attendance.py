@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import (
-    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Numeric, UniqueConstraint
+    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Numeric, UniqueConstraint, Integer
 )
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -40,7 +40,7 @@ class Attendance(Base, TimestampMixin, UpdatedAtMixin):
     __tablename__ = "attendance"
     __table_args__ = (UniqueConstraint("employee_id", "attendance_date", name="uq_attendance_employee_date"),)
 
-    attendance_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    attendance_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("employees.employee_id"))
     attendance_date: Mapped[date] = mapped_column(Date)
     check_in_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

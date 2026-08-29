@@ -141,6 +141,22 @@ export const api = {
     method: "POST", body: JSON.stringify({ comment: null }),
   }, token),
   salary: (id: number, token: string) => request<ApiSalary>(`/salary/${id}`, {}, token),
+  updateSalary: (id: number, payload: {
+    monthly_wage: number;
+    wage_type?: string;
+    effective_from: string;
+    components: Array<{
+      name: string;
+      type: string;
+      calculation_type: string;
+      percentage?: number | null;
+      fixed_amount?: number | null;
+    }>;
+  }, token: string) => request<ApiSalary>(`/salary/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }, token),
+  allSalaries: (token: string) => request<{ items: ApiSalary[] }>("/salary", {}, token),
   logout: (refreshToken: string, token: string) => request<void>("/auth/logout", {
     method: "POST", body: JSON.stringify({ refresh_token: refreshToken }),
   }, token),

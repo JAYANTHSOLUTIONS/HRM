@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_admin
 from app.models.auth import User
-from app.schemas.salary import SalaryStructureIn, SalaryStructureOut, SalaryComponentOut, SalaryHistoryOut
-from app.services.salary_service import get_current_salary, get_salary_history, create_salary_structure
+from app.schemas.salary import SalaryStructureIn, SalaryStructureOut, SalaryComponentOut, SalaryHistoryOut, SalaryListOut
+from app.services.salary_service import get_current_salary, get_salary_history, get_all_salaries, create_salary_structure
 from app.exceptions import not_found
 
 router = APIRouter(prefix="/salary", tags=["Salary (Admin only)"])
@@ -29,6 +29,12 @@ def _to_out(structure) -> SalaryStructureOut:
             for c in structure.components
         ],
     )
+
+
+@router.get("", response_model=SalaryListOut)
+def list_salaries(db: Session = Depends(get_db), _=Depends(require_admin)):
+    structures = get_all_salaries(db)
+    return {"items": [_to_out(s) for s in structures]}
 
 
 @router.get("/{employee_id}", response_model=SalaryStructureOut)

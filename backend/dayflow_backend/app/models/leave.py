@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, SmallInteger, Numeric
+    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, SmallInteger, Numeric, Integer
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,7 +26,7 @@ class LeaveType(Base, TimestampMixin):
 class LeaveBalance(Base, TimestampMixin, UpdatedAtMixin):
     __tablename__ = "leave_balances"
 
-    leave_balance_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    leave_balance_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("employees.employee_id"))
     leave_type_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("leave_types.leave_type_id"))
     leave_year: Mapped[int] = mapped_column(SmallInteger)
@@ -43,7 +43,7 @@ class LeaveBalance(Base, TimestampMixin, UpdatedAtMixin):
 class LeaveRequest(Base, TimestampMixin, UpdatedAtMixin):
     __tablename__ = "leave_requests"
 
-    leave_request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    leave_request_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("employees.employee_id"))
     leave_type_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("leave_types.leave_type_id"))
     start_date: Mapped[date] = mapped_column(Date)
@@ -64,7 +64,7 @@ class LeaveRequest(Base, TimestampMixin, UpdatedAtMixin):
 class LeaveRequestReview(Base):
     __tablename__ = "leave_request_reviews"
 
-    review_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    review_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     leave_request_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("leave_requests.leave_request_id"))
     reviewer_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"))
     previous_status: Mapped[str] = mapped_column(Enum(*LEAVE_STATUS, name="leave_prev_status_enum"))
