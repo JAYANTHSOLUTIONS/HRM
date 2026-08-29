@@ -814,6 +814,7 @@ function TimeOffPage() {
   const [balances, setBalances] = useState([])
   const [requests, setRequests] = useState([])
   const [leaveTypes, setLeaveTypes] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -821,8 +822,13 @@ function TimeOffPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [b, r, t] = await Promise.all([meApi.getLeaveBalances(), meApi.getLeaveRequests(), meApi.getLeaveTypes()])
-      setBalances(b || []); setRequests(r || []); setLeaveTypes(t || [])
+      const [b, r, t, p] = await Promise.all([
+        meApi.getLeaveBalances(),
+        meApi.getLeaveRequests(),
+        meApi.getLeaveTypes(),
+        meApi.getProfile()
+      ])
+      setBalances(b || []); setRequests(r || []); setLeaveTypes(t || []); setProfile(p || null)
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -831,6 +837,29 @@ function TimeOffPage() {
 
   async function cancelRequest(id) {
     try { await meApi.cancelLeave(id); load() } catch (e) { setError(e.message) }
+  }
+
+  async function downloadAttachment(path, fileName) {
+    try {
+      const url = path.startsWith("http") ? path : `http://localhost:8000${path}`;
+      const response = await fetch(url, {
+        headers: {
+          "Authorization": `Bearer ${tokenStore.get()}`
+        }
+      });
+      if (!response.ok) throw new Error("Could not download attachment");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName || "attachment";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      alert(err.message || "Failed to download attachment");
+    }
   }
 
   return (
@@ -869,6 +898,9 @@ function TimeOffPage() {
             ))}
           </div>
 
+          {/* Annual Leave Calendar */}
+          <AnnualCalendar requests={requests} />
+
           <div className="df-card p-0 overflow-hidden">
             <div className="p-3 border-bottom d-flex justify-content-between align-items-center bg-white">
               <h3 className="df-section-title fs-6 mb-0"><i className="bi bi-list-check me-2 text-primary" />My Leave Requests</h3>
@@ -884,11 +916,30 @@ function TimeOffPage() {
                     <tr><td colSpan={7} className="text-center text-muted py-4">No leave requests yet</td></tr>
                   ) : requests.map(r => (
                     <tr key={r.leave_request_id}>
-                      <td><strong>{r.leave_type_name}</strong></td>
+                      <td>
+                        <strong>{r.leave_type_name}</strong>
+                        {r.attachment_path && (
+                          <span
+                            className="ms-2 text-primary"
+                            title="Download Certificate"
+                            onClick={() => downloadAttachment(r.attachment_path, `${r.leave_type_name}_certificate`)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <i className="bi bi-file-earmark-arrow-down-fill" />
+                          </span>
+                        )}
+                      </td>
                       <td>{fmtDate(r.start_date)}</td>
                       <td>{fmtDate(r.end_date)}</td>
                       <td>{Number(r.number_of_days).toFixed(0)}</td>
-                      <td><Badge status={r.status} /></td>
+                      <td>
+                        <Badge status={r.status} />
+                        {r.review_comment && (
+                          <div className="text-muted mt-1" style={{ fontSize: 11, fontStyle: 'italic' }}>
+                            "{r.review_comment}"
+                          </div>
+                        )}
+                      </td>
                       <td className="df-stat-sub" style={{ maxWidth: 200 }}>{r.remarks || '—'}</td>
                       <td>
                         {r.status === 'PENDING' && (
@@ -907,6 +958,7 @@ function TimeOffPage() {
       {showModal && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
+          profile={profile}
           onClose={() => setShowModal(false)}
           onSuccess={() => { setShowModal(false); load() }}
         />
@@ -915,37 +967,232 @@ function TimeOffPage() {
   )
 }
 
-function LeaveRequestModal({ leaveTypes, onClose, onSuccess }) {
+function AnnualCalendar({ requests }) {
+  const year = 2026;
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+
+  const publicHolidays = {
+    "2026-01-01": "New Year's Day",
+    "2026-01-26": "Republic Day",
+    "2026-08-15": "Independence Day",
+    "2026-12-25": "Christmas"
+  };
+
+  function getDateStatus(dateStr, dateObj) {
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    const isHoliday = publicHolidays[dateStr];
+    
+    for (const req of requests) {
+      if (req.status === 'REJECTED' || req.status === 'CANCELLED') continue;
+      if (dateStr >= req.start_date && dateStr <= req.end_date) {
+        return {
+          status: req.status,
+          name: req.leave_type_name
+        };
+      }
+    }
+
+    if (isHoliday) return { status: 'HOLIDAY', name: isHoliday };
+    if (isWeekend) return { status: 'WEEKEND', name: 'Weekend' };
+    return null;
+  }
+
+  return (
+    <div className="df-card p-4 mb-4" style={{ background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+      <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2 flex-wrap gap-2">
+        <h3 className="df-section-title fs-6 mb-0">
+          <i className="bi bi-calendar3 me-2 text-primary" />
+          Annual Leave Calendar (2026)
+        </h3>
+        <div className="d-flex gap-3 flex-wrap" style={{ fontSize: 12 }}>
+          <div className="d-flex align-items-center gap-1">
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#10b981" }} />
+            <span>Approved</span>
+          </div>
+          <div className="d-flex align-items-center gap-1">
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
+            <span>Pending</span>
+          </div>
+          <div className="d-flex align-items-center gap-1">
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
+            <span>Holiday</span>
+          </div>
+          <div className="d-flex align-items-center gap-1">
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#e5e7eb", border: "1px solid #d1d5db" }} />
+            <span>Weekend</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-3">
+        {months.map((monthName, monthIdx) => {
+          const firstDay = new Date(year, monthIdx, 1);
+          const startDayOfWeek = firstDay.getDay();
+          const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+          const blanks = Array(startDayOfWeek).fill(null);
+          const days = Array.from({ length: daysInMonth }, (_, idx) => idx + 1);
+          const totalCells = [...blanks, ...days];
+
+          return (
+            <div key={monthName} className="col-md-4 col-sm-6 col-12">
+              <div className="p-2 border rounded" style={{ background: "#fafafa" }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "var(--df-navy)", textAlign: "center", marginBottom: 6 }}>
+                  {monthName}
+                </div>
+                
+                <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#6b7280" }}>
+                  {weekdays.map((wd, i) => <div key={i}>{wd}</div>)}
+                </div>
+
+                <div className="d-grid mt-1" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
+                  {totalCells.map((dayNum, cellIdx) => {
+                    if (dayNum === null) {
+                      return <div key={`blank-${cellIdx}`} style={{ height: 20 }} />;
+                    }
+
+                    const formattedMonth = String(monthIdx + 1).padStart(2, '0');
+                    const formattedDay = String(dayNum).padStart(2, '0');
+                    const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+                    const dateObj = new Date(year, monthIdx, dayNum);
+
+                    const dayStatus = getDateStatus(dateStr, dateObj);
+                    
+                    let bg = "transparent";
+                    let color = "#374151";
+                    let title = "";
+
+                    if (dayStatus) {
+                      title = dayStatus.name;
+                      if (dayStatus.status === 'APPROVED') {
+                        bg = "#10b981";
+                        color = "#fff";
+                      } else if (dayStatus.status === 'PENDING') {
+                        bg = "#f59e0b";
+                        color = "#fff";
+                      } else if (dayStatus.status === 'HOLIDAY') {
+                        bg = "#ef4444";
+                        color = "#fff";
+                      } else if (dayStatus.status === 'WEEKEND') {
+                        bg = "#f3f4f6";
+                        color = "#9ca3af";
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={`day-${dayNum}`}
+                        title={title}
+                        style={{
+                          height: 20,
+                          fontSize: 10,
+                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 4,
+                          background: bg,
+                          color: color,
+                          cursor: title ? "help" : "default"
+                        }}
+                      >
+                        {dayNum}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LeaveRequestModal({ leaveTypes, onClose, onSuccess, profile }) {
   const [form, setForm] = useState({ leave_type_id: '', start_date: '', end_date: '', remarks: '' })
+  const [file, setFile] = useState(null)
+  const [attachmentPath, setAttachmentPath] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e) {
-    e.preventDefault(); setLoading(true); setError('')
+  const selectedType = leaveTypes.find(t => String(t.leave_type_id) === String(form.leave_type_id))
+  const requiresAttachment = selectedType?.requires_attachment ?? false
+
+  let allocationDays = 0
+  if (form.start_date && form.end_date) {
+    const start = new Date(form.start_date)
+    const end = new Date(form.end_date)
+    if (end >= start) {
+      allocationDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1
+    }
+  }
+
+  async function handleFileChange(e) {
+    const chosenFile = e.target.files[0]
+    if (!chosenFile) return
+    setFile(chosenFile)
+    setUploadingFile(true)
+    setError('')
     try {
-      await meApi.applyLeave({ ...form, leave_type_id: Number(form.leave_type_id) })
+      const result = await meApi.uploadDocument(profile.employee_id, 'Sick Leave Certificate', chosenFile)
+      setAttachmentPath(result.view_url)
+    } catch (err) {
+      setError(err.message || 'File upload failed.')
+      setFile(null)
+    } finally {
+      setUploadingFile(false)
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault(); 
+    if (requiresAttachment && !attachmentPath) {
+      setError('An attachment certificate is required for Sick Leave.')
+      return
+    }
+    setLoading(true); setError('')
+    try {
+      await meApi.applyLeave({
+        ...form,
+        leave_type_id: Number(form.leave_type_id),
+        attachment_path: attachmentPath || null
+      })
       onSuccess()
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
 
   return (
-    <div className="df-modal-overlay" onClick={onClose}>
-      <div className="df-modal-content" onClick={e => e.stopPropagation()}>
+    <div className="df-modal-overlay" onClick={onClose} style={{ zIndex: 1050 }}>
+      <div className="df-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
         <div className="p-3 border-bottom d-flex align-items-center justify-content-between">
-          <h3 className="df-section-title fs-6"><i className="bi bi-calendar-plus me-2 text-primary" />Request Time Off</h3>
+          <h3 className="df-section-title fs-6 mb-0"><i className="bi bi-calendar-plus me-2 text-primary" />Time off Type Request</h3>
           <button className="btn-close" onClick={onClose} />
         </div>
         <form onSubmit={handleSubmit} className="p-4">
           <Alert msg={error} onClose={() => setError('')} />
+          
           <div className="mb-3">
-            <label className="df-stat-label mb-1">Leave Type</label>
+            <label className="df-stat-label mb-1">Employee</label>
+            <input className="df-input w-100" type="text" value={profile?.full_name || 'Loading...'} readOnly style={{ background: '#f3f4f6' }} />
+          </div>
+
+          <div className="mb-3">
+            <label className="df-stat-label mb-1">Time off Type</label>
             <select className="df-input w-100" value={form.leave_type_id}
-              onChange={e => setForm({ ...form, leave_type_id: e.target.value })} required>
+              onChange={e => setForm({ ...form, leave_type_id: e.target.value, attachment_path: '' })} required>
               <option value="">Select leave type</option>
               {leaveTypes.map(t => <option key={t.leave_type_id} value={t.leave_type_id}>{t.name}</option>)}
             </select>
           </div>
+
           <div className="row g-3 mb-3">
             <div className="col-6">
               <label className="df-stat-label mb-1">From Date</label>
@@ -958,15 +1205,56 @@ function LeaveRequestModal({ leaveTypes, onClose, onSuccess }) {
                 onChange={e => setForm({ ...form, end_date: e.target.value })} required min={form.start_date} />
             </div>
           </div>
+
+          <div className="mb-3 d-flex align-items-center justify-content-between p-2 rounded" style={{ background: '#f3f4f6' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--df-navy)' }}>Allocation</span>
+            <span className="fw-bold text-primary" style={{ fontSize: 15 }}>{allocationDays.toFixed(2)} Days</span>
+          </div>
+
+          {requiresAttachment && (
+            <div className="mb-3">
+              <label className="df-stat-label mb-1">Attachment <span className="text-danger">*</span></label>
+              <div className="border rounded p-3 text-center bg-white position-relative">
+                <i className="bi bi-cloud-arrow-up text-primary" style={{ fontSize: 24 }} />
+                <div style={{ fontSize: 12, color: 'var(--df-text-muted)', marginTop: 4 }}>
+                  (For sick leave certificate)
+                </div>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileChange}
+                  required
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer'
+                  }}
+                  disabled={uploadingFile}
+                />
+                {file && (
+                  <div className="mt-2 text-success" style={{ fontSize: 12, fontWeight: 500 }}>
+                    <i className="bi bi-file-earmark-check me-1" />
+                    {file.name} {uploadingFile ? '(Uploading...)' : '(Uploaded)'}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mb-3">
             <label className="df-stat-label mb-1">Remarks <span className="text-muted">(optional)</span></label>
-            <textarea className="df-input w-100" rows={3} placeholder="Add a note for your manager..."
+            <textarea className="df-input w-100" rows={3} placeholder="Add remarks/notes for your manager..."
               value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} />
           </div>
+
           <div className="d-flex justify-content-end gap-2 mt-4">
             <button type="button" className="df-btn-secondary" onClick={onClose}>Discard</button>
-            <button type="submit" className="df-btn-primary" disabled={loading}>
-              {loading ? <><span className="spinner-border spinner-border-sm me-2" />Submitting...</> : 'Submit Request'}
+            <button type="submit" className="df-btn-primary" disabled={loading || uploadingFile}>
+              {loading ? <><span className="spinner-border spinner-border-sm me-2" />Submitting...</> : 'Submit'}
             </button>
           </div>
         </form>

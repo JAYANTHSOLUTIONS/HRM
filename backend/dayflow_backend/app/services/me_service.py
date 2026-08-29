@@ -264,6 +264,13 @@ def apply_leave(db: Session, employee_id: int, payload: LeaveApplyRequest, user_
     if leave_type is None:
         raise not_found("Leave type")
 
+    # Enforce attachment requirement
+    if leave_type.requires_attachment and not payload.attachment_path:
+        raise bad_request(
+            f"An attachment is required for leave type '{leave_type.name}'.",
+            code="ATTACHMENT_REQUIRED"
+        )
+
     # Calculate business days (naive: all calendar days including weekends for now)
     delta = (payload.end_date - payload.start_date).days + 1
     number_of_days = Decimal(str(delta))
@@ -289,6 +296,7 @@ def apply_leave(db: Session, employee_id: int, payload: LeaveApplyRequest, user_
         end_date=payload.end_date,
         number_of_days=number_of_days,
         remarks=payload.remarks,
+        attachment_path=payload.attachment_path,
         status="PENDING",
         submitted_at=datetime.now(timezone.utc),
     )
@@ -303,6 +311,7 @@ def apply_leave(db: Session, employee_id: int, payload: LeaveApplyRequest, user_
             "start_date": str(payload.start_date),
             "end_date": str(payload.end_date),
             "number_of_days": str(number_of_days),
+            "attachment_path": payload.attachment_path,
         },
     )
     db.commit()
@@ -315,6 +324,7 @@ def apply_leave(db: Session, employee_id: int, payload: LeaveApplyRequest, user_
         "end_date": lr.end_date,
         "number_of_days": lr.number_of_days,
         "remarks": lr.remarks,
+        "attachment_path": lr.attachment_path,
         "status": lr.status,
         "submitted_at": lr.submitted_at,
         "reviewed_at": None,

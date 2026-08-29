@@ -25,6 +25,7 @@ def _to_out(lr) -> LeaveRequestOut:
         end_date=lr.end_date,
         number_of_days=lr.number_of_days,
         remarks=lr.remarks,
+        attachment_path=lr.attachment_path,
         status=lr.status,
         submitted_at=lr.submitted_at,
         reviewed_by=lr.reviewed_by,

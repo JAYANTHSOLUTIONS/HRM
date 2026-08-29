@@ -103,6 +103,7 @@ class LeaveApplyRequest(BaseModel):
     start_date: date
     end_date: date
     remarks: str | None = Field(default=None, max_length=1000)
+    attachment_path: str | None = Field(default=None, max_length=1000)
 
     def model_post_init(self, __context) -> None:
         if self.end_date < self.start_date:
@@ -117,6 +118,7 @@ class MyLeaveRequestOut(BaseModel):
     end_date: date
     number_of_days: Decimal
     remarks: str | None = None
+    attachment_path: str | None = None
     status: str
     submitted_at: datetime
     reviewed_at: datetime | None = None

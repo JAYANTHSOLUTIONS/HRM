@@ -47,7 +47,9 @@ export interface ApiLeaveRequest {
   end_date: string;
   number_of_days: number;
   remarks: string | null;
+  attachment_path: string | null;
   status: string;
+  review_comment: string | null;
 }
 
 export interface ApiDashboard {
@@ -137,8 +139,8 @@ export const api = {
   dashboard: (token: string) => request<ApiDashboard>("/dashboard/admin", {}, token),
   attendance: (date: string, token: string) => request<Page<ApiAttendance>>(`/attendance?date=${date}&page_size=100`, {}, token),
   leaveRequests: (token: string) => request<Page<ApiLeaveRequest>>("/leave/requests?page_size=100", {}, token),
-  reviewLeave: (id: number, decision: "approve" | "reject", token: string) => request<ApiLeaveRequest>(`/leave/requests/${id}/${decision}`, {
-    method: "POST", body: JSON.stringify({ comment: null }),
+  reviewLeave: (id: number, decision: "approve" | "reject", comment: string | null, token: string) => request<ApiLeaveRequest>(`/leave/requests/${id}/${decision}`, {
+    method: "POST", body: JSON.stringify({ comment }),
   }, token),
   salary: (id: number, token: string) => request<ApiSalary>(`/salary/${id}`, {}, token),
   updateSalary: (id: number, payload: {

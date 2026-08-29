@@ -22,6 +22,7 @@ class LeaveRequestOut(BaseModel):
     end_date: date
     number_of_days: Decimal
     remarks: str | None = None
+    attachment_path: str | None = None
     status: str
     submitted_at: datetime
     reviewed_by: int | None = None

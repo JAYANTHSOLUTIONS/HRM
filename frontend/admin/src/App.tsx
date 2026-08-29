@@ -30,6 +30,8 @@ interface TimeOffRequest {
   days: number;
   reason: string;
   status: TimeOffStatus;
+  attachmentPath?: string;
+  reviewComment?: string;
 }
 
 interface AttendanceRecord {
@@ -101,6 +103,8 @@ function mapLeave(request: ApiLeaveRequest): TimeOffRequest {
     days: Number(request.number_of_days),
     reason: request.remarks ?? "",
     status: request.status.toLowerCase() as TimeOffStatus,
+    attachmentPath: request.attachment_path ?? undefined,
+    reviewComment: request.review_comment ?? undefined,
   };
 }
 
@@ -1847,23 +1851,58 @@ function TimeOff() {
   const [filter, setFilter] = useState<"all" | TimeOffStatus>("all");
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
+  // Leave approval states
+  const [reviewRequest, setReviewRequest] = useState<{ id: number; decision: "approved" | "rejected" } | null>(null);
+  const [reviewComment, setReviewComment] = useState("");
+
   useEffect(() => setRequests(loadedRequests), [loadedRequests]);
 
-  async function decide(id: number, decision: "approved" | "rejected") {
+  function startReview(id: number, decision: "approved" | "rejected") {
+    setReviewRequest({ id, decision });
+    setReviewComment("");
+  }
+
+  async function submitDecision() {
+    if (!reviewRequest) return;
+    const { id, decision } = reviewRequest;
     try {
-      await api.reviewLeave(id, decision === "approved" ? "approve" : "reject", token);
+      await api.reviewLeave(id, decision === "approved" ? "approve" : "reject", reviewComment || null, token);
       await refresh();
       setFeedback({
         type: "success",
         title: decision === "approved" ? "Leave Approved!" : "Leave Rejected",
         message: `The leave request has been successfully ${decision}.`,
       });
+      setReviewRequest(null);
     } catch (error) {
       setFeedback({
         type: "error",
         title: "Update Failed",
         message: error instanceof Error ? error.message : "Unable to update request",
       });
+    }
+  }
+
+  async function downloadAttachment(path: string, fileName: string) {
+    try {
+      const url = path.startsWith("http") ? path : `http://localhost:8000${path}`;
+      const response = await fetch(url, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error("Could not download attachment");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName || "attachment";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to download attachment");
     }
   }
 
@@ -1938,15 +1977,34 @@ function TimeOff() {
                     {formatDate(r.from)} – {formatDate(r.to)}
                   </td>
                   <td className="tabnum" style={{ fontWeight: 700 }}>{r.days}</td>
-                  <td style={{ color: "var(--df-text-muted)", maxWidth: 200, fontSize: 13 }}>{r.reason}</td>
-                  <td><StatusBadge status={r.status} /></td>
+                  <td style={{ color: "var(--df-text)", maxWidth: 200, fontSize: 13 }}>
+                    <div className="fw-semibold text-muted">{r.reason}</div>
+                    {r.attachmentPath && (
+                      <button
+                        className="btn btn-link p-0 d-inline-flex align-items-center gap-1 text-primary border-0 bg-transparent"
+                        style={{ fontSize: 12, textDecoration: "none", marginTop: 4 }}
+                        onClick={() => downloadAttachment(r.attachmentPath!, `${emp.name.replace(/\s+/g, "_")}_${r.type}_certificate`)}
+                      >
+                        <i className="bi bi-file-earmark-arrow-down" />
+                        Download Certificate
+                      </button>
+                    )}
+                  </td>
+                  <td>
+                    <StatusBadge status={r.status} />
+                    {r.reviewComment && (
+                      <div style={{ fontSize: 11, color: "var(--df-text-muted)", marginTop: 4, maxWidth: 150, fontStyle: "italic" }}>
+                        "{r.reviewComment}"
+                      </div>
+                    )}
+                  </td>
                   <td>
                     {r.status === "pending" ? (
                       <div className="d-flex gap-2">
-                        <button className="df-btn-approve" onClick={() => decide(r.id, "approved")}>
+                        <button className="df-btn-approve" onClick={() => startReview(r.id, "approved")}>
                           <i className="bi bi-check-lg" /> Approve
                         </button>
-                        <button className="df-btn-reject" onClick={() => decide(r.id, "rejected")}>
+                        <button className="df-btn-reject" onClick={() => startReview(r.id, "rejected")}>
                           <i className="bi bi-x-lg" /> Reject
                         </button>
                       </div>
@@ -1961,6 +2019,40 @@ function TimeOff() {
         </table>
       </div>
       {feedback && <FeedbackModal feedback={feedback} onClose={() => setFeedback(null)} />}
+
+      {/* Review Dialog */}
+      {reviewRequest && (
+        <div className="df-modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1050 }}>
+          <div className="df-card p-4" style={{ width: 450, background: "#fff", borderRadius: 12, border: "1px solid var(--df-border)" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--df-navy)", marginBottom: 16 }}>
+              {reviewRequest.decision === "approved" ? "Approve Leave Request" : "Reject Leave Request"}
+            </h3>
+            <div className="mb-3">
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--df-text)", marginBottom: 6, display: "block" }}>
+                Add Comment / Remarks (optional)
+              </label>
+              <textarea
+                className="df-input w-100"
+                rows={3}
+                placeholder="Enter comments for the employee..."
+                value={reviewComment}
+                onChange={e => setReviewComment(e.target.value)}
+                style={{ padding: 10, fontSize: 13 }}
+              />
+            </div>
+            <div className="d-flex justify-content-end gap-2">
+              <button className="df-btn-secondary px-3 py-2" onClick={() => setReviewRequest(null)}>Cancel</button>
+              <button
+                className={reviewRequest.decision === "approved" ? "df-btn-primary px-3 py-2" : "df-btn-reject px-3 py-2"}
+                onClick={submitDecision}
+                style={{ border: "none" }}
+              >
+                Confirm {reviewRequest.decision === "approved" ? "Approval" : "Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

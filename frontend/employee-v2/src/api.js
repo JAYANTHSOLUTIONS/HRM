@@ -72,6 +72,19 @@ export const meApi = {
   // Leave reference
   getLeaveTypes: () => req('/api/v1/leave-types'),
 
+  // Documents
+  uploadDocument: (employeeId, documentType, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('document_type', documentType)
+    const headers = {}
+    const token = tokenStore.get()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch(`${BASE}/api/v1/employees/${employeeId}/documents`, {
+      method: 'POST', headers, body: form,
+    }).then(r => r.ok ? r.json() : r.json().then(b => Promise.reject(new Error(b?.error?.message || 'Upload failed'))))
+  },
+
   // Salary
   getSalary: () => req('/api/v1/me/salary'),
 
