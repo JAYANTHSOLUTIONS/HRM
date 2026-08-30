@@ -88,6 +88,10 @@ export const meApi = {
   // Salary
   getSalary: () => req('/api/v1/me/salary'),
 
+  // Resume
+  getResume: (employeeId) => req(`/api/v1/employees/${employeeId}/resume`),
+  updateResume: (employeeId, data) => req(`/api/v1/employees/${employeeId}/resume`, { method: 'PATCH', body: JSON.stringify(data) }),
+
   // Profile picture
   uploadProfilePicture: (employeeId, file) => {
     const form = new FormData()

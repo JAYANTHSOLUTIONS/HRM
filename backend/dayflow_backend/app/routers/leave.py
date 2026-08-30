@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_admin_or_hr
+from app.core.deps import require_admin_or_hr, require_any_role
 from app.models.auth import User
 from app.schemas.leave import LeaveTypeOut, LeaveRequestOut, LeaveReviewRequest
 from app.schemas.common import Page
@@ -35,7 +35,7 @@ def _to_out(lr) -> LeaveRequestOut:
 
 
 @router.get("/leave-types", response_model=list[LeaveTypeOut])
-def get_leave_types(db: Session = Depends(get_db), _=Depends(require_admin_or_hr)):
+def get_leave_types(db: Session = Depends(get_db), _=Depends(require_any_role)):
     return list_leave_types(db)
 
 

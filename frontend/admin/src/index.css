@@ -264,7 +264,8 @@ h1, h2, h3, h4, h5, h6,
 .df-table tbody td {
   padding: 11px 16px;
   font-size: 13.5px;
-  color: var(--df-navy);
+  color: #000000;
+  font-weight: 500;
   vertical-align: middle;
 }
 

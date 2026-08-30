@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
-    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Integer,
+    String, Boolean, Date, TIMESTAMP, Enum, ForeignKey, BigInteger, Integer, JSON
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,6 +59,7 @@ class Employee(Base, TimestampMixin, UpdatedAtMixin):
     department: Mapped["Department | None"] = relationship()
     designation: Mapped["Designation | None"] = relationship()
     manager: Mapped["Employee | None"] = relationship(remote_side=[employee_id])
+    resume: Mapped[EmployeeResume | None] = relationship(back_populates="employee", cascade="all, delete-orphan", uselist=False)
 
     @property
     def full_name(self) -> str:
@@ -89,6 +90,23 @@ class Holiday(Base, TimestampMixin):
     holiday_date: Mapped[date] = mapped_column(Date, unique=True)
     name: Mapped[str] = mapped_column(String(150))
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class EmployeeResume(Base, TimestampMixin, UpdatedAtMixin):
+    __tablename__ = "employee_resumes"
+
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("employees.employee_id", ondelete="CASCADE"),
+        primary_key=True
+    )
+    about: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    what_i_love: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    interests: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    skills: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    certifications: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+
+    employee: Mapped["Employee"] = relationship(back_populates="resume")
 
 
 from app.models.auth import User  # noqa: E402  (needed for relationship string resolution)

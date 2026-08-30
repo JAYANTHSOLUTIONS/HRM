@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, login, signup, type ApiDashboard, type ApiEmployee, type ApiAttendance, type ApiLeaveRequest, type ApiSalary, type ApiUser, type ApiDepartment, type ApiDesignation } from "./api";
+import loginBanner from "./login_banner.jpg";
+import logoImg from "./logo.png";
+import rocketIcon from "./rocket_icon.jpg";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -515,7 +518,9 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
     setInviteBusy(true);
     setInviteError("");
     setInviteMessage("");
-    const form = new FormData(event.currentTarget);
+    // Save form reference before any async operations — the form may unmount
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     try {
       const result = await api.inviteEmployee({
         email: String(form.get("email")),
@@ -526,7 +531,7 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
         department_id: Number(form.get("department_id")) || undefined,
         designation_id: Number(form.get("designation_id")) || undefined,
       }, token);
-      await refresh();
+      // Close the invite modal first, then show success feedback
       setShowInvite(false);
       setFeedback({
         type: "success",
@@ -534,12 +539,14 @@ function EmployeeList({ onNav }: { onNav: (p: Page, id?: number) => void }) {
         message: result.message || "Invitation email with credentials has been sent.",
         details: `Employee Code: ${result.employee_code}`,
       });
-      event.currentTarget.reset();
+      // Refresh employee list in background (don't await — modal already shown)
+      void refresh();
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Unable to invite employee";
       setFeedback({
         type: "error",
         title: "Invitation Failed",
-        message: error instanceof Error ? error.message : "Unable to invite employee",
+        message: errMsg,
       });
     } finally {
       setInviteBusy(false);
@@ -806,9 +813,35 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
   const emp = employees.find(e => e.id === empId);
   const [salary, setSalary] = useState<ApiSalary | null>(null);
 
+  const [resumeData, setResumeData] = useState<ResumeDetails>({
+    about: "",
+    whatILove: "",
+    interests: "",
+    skills: [],
+    certifications: [],
+  });
+
   useEffect(() => {
     if (empId && token) {
       void api.salary(empId, token).then(setSalary).catch(() => setSalary(null));
+      void api.resume(empId, token)
+        .then(res => {
+          if (res) {
+            setResumeData({
+              about: res.about || "",
+              whatILove: res.what_i_love || "",
+              interests: res.interests || "",
+              skills: (res.skills || []).map((s, idx) => ({ id: String(idx + 1), name: s })),
+              certifications: (res.certifications || []).map((c: any) => ({
+                id: String(c.id),
+                title: c.title,
+                issuer: c.issuer,
+                issueDate: c.issueDate
+              }))
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, [empId, token]);
 
@@ -826,29 +859,9 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
     setTab(initialTab);
   }, [empId, initialTab]);
 
-  // Resume state mapping
-  const [resumeMap, setResumeMap] = useState<Record<number, ResumeDetails>>(INITIAL_RESUME_DATA);
-  const currentResume = resumeMap[empId] || {
-    about: "",
-    whatILove: "",
-    interests: "",
-    skills: [],
-    certifications: [],
-  };
+  const currentResume = resumeData;
 
-  // Modals state
-  const [editModalField, setEditModalField] = useState<"about" | "whatILove" | "interests" | "all" | null>(null);
-  const [aboutInput, setAboutInput] = useState("");
-  const [whatILoveInput, setWhatILoveInput] = useState("");
-  const [interestsInput, setInterestsInput] = useState("");
 
-  const [showSkillModal, setShowSkillModal] = useState(false);
-  const [newSkillName, setNewSkillName] = useState("");
-
-  const [showCertModal, setShowCertModal] = useState(false);
-  const [newCertTitle, setNewCertTitle] = useState("");
-  const [newCertIssuer, setNewCertIssuer] = useState("");
-  const [newCertDate, setNewCertDate] = useState("");
 
   // Salary Info State
   const [monthWage, setMonthWage] = useState<number>(50000);
@@ -953,85 +966,7 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
   }
 
 
-  function openAboutModal(field: "about" | "whatILove" | "interests" | "all" = "all") {
-    setEditModalField(field);
-    setAboutInput(currentResume.about);
-    setWhatILoveInput(currentResume.whatILove);
-    setInterestsInput(currentResume.interests);
-  }
 
-  function handleSaveAbout() {
-    setResumeMap(prev => ({
-      ...prev,
-      [empId]: {
-        ...currentResume,
-        about: aboutInput,
-        whatILove: whatILoveInput,
-        interests: interestsInput,
-      }
-    }));
-    setEditModalField(null);
-  }
-
-  function handleAddSkill(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!newSkillName.trim()) return;
-    const newSkill: SkillItem = {
-      id: "s_" + Date.now(),
-      name: newSkillName.trim(),
-    };
-    setResumeMap(prev => ({
-      ...prev,
-      [empId]: {
-        ...currentResume,
-        skills: [...currentResume.skills, newSkill],
-      }
-    }));
-    setNewSkillName("");
-    setShowSkillModal(false);
-  }
-
-  function handleRemoveSkill(skillId: string) {
-    setResumeMap(prev => ({
-      ...prev,
-      [empId]: {
-        ...currentResume,
-        skills: currentResume.skills.filter(s => s.id !== skillId),
-      }
-    }));
-  }
-
-  function handleAddCert(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!newCertTitle.trim()) return;
-    const newCert: CertificationItem = {
-      id: "c_" + Date.now(),
-      title: newCertTitle.trim(),
-      issuer: newCertIssuer.trim() || "Independent",
-      issueDate: newCertDate.trim() || new Date().toISOString().substring(0, 7),
-    };
-    setResumeMap(prev => ({
-      ...prev,
-      [empId]: {
-        ...currentResume,
-        certifications: [...currentResume.certifications, newCert],
-      }
-    }));
-    setNewCertTitle("");
-    setNewCertIssuer("");
-    setNewCertDate("");
-    setShowCertModal(false);
-  }
-
-  function handleRemoveCert(certId: string) {
-    setResumeMap(prev => ({
-      ...prev,
-      [empId]: {
-        ...currentResume,
-        certifications: currentResume.certifications.filter(c => c.id !== certId),
-      }
-    }));
-  }
 
   return (
     <div className="df-page">
@@ -1101,9 +1036,6 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                     {/* About */}
                     <div className="d-flex align-items-center justify-content-between">
                       <h3 className="df-resume-box-title mb-0">About</h3>
-                      <button className="df-edit-icon-btn" title="Edit About" onClick={() => openAboutModal("about")}>
-                        <i className="bi bi-pencil" />
-                      </button>
                     </div>
                     <p className="df-resume-text mb-4 mt-2">
                       {currentResume.about || "No description provided. Click pencil to add."}
@@ -1112,9 +1044,6 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                     {/* What I love about my job */}
                     <div className="d-flex align-items-center justify-content-between pt-2 border-top">
                       <h4 className="df-resume-subtitle">What I love about my job</h4>
-                      <button className="df-edit-icon-btn" title="Edit What I Love" onClick={() => openAboutModal("whatILove")}>
-                        <i className="bi bi-pencil" />
-                      </button>
                     </div>
                     <p className="df-resume-text mb-4 mt-1">
                       {currentResume.whatILove || "No preferences specified. Click pencil to add."}
@@ -1123,9 +1052,6 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                     {/* My interests and hobbies */}
                     <div className="d-flex align-items-center justify-content-between pt-2 border-top">
                       <h4 className="df-resume-subtitle">My interests and hobbies</h4>
-                      <button className="df-edit-icon-btn" title="Edit Interests and Hobbies" onClick={() => openAboutModal("interests")}>
-                        <i className="bi bi-pencil" />
-                      </button>
                     </div>
                     <p className="df-resume-text mt-1">
                       {currentResume.interests || "No interests specified. Click pencil to add."}
@@ -1144,24 +1070,15 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                       </span>
                     </div>
 
-                    <div className="d-flex flex-wrap gap-2 mb-4" style={{ minHeight: 70 }}>
+                    <div className="d-flex flex-wrap gap-2 mb-2" style={{ minHeight: 70 }}>
                       {currentResume.skills.length === 0 ? (
                         <span className="text-muted" style={{ fontSize: 13, fontStyle: "italic" }}>No skills added yet.</span>
                       ) : (
                         currentResume.skills.map(s => (
-                          <span key={s.id} className="df-skill-chip">
-                            {s.name}
-                            <button className="df-skill-chip-delete" title="Remove" onClick={() => handleRemoveSkill(s.id)}>
-                              <i className="bi bi-x" />
-                            </button>
-                          </span>
+                          <span key={s.id} className="df-skill-chip">{s.name}</span>
                         ))
                       )}
                     </div>
-
-                    <button className="df-add-btn" onClick={() => setShowSkillModal(true)}>
-                      <i className="bi bi-plus-lg" /> + Add Skills
-                    </button>
                   </div>
 
                   {/* Certification Box */}
@@ -1173,7 +1090,7 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                       </span>
                     </div>
 
-                    <div className="mb-4" style={{ minHeight: 70 }}>
+                    <div className="mb-2" style={{ minHeight: 70 }}>
                       {currentResume.certifications.length === 0 ? (
                         <span className="text-muted" style={{ fontSize: 13, fontStyle: "italic" }}>No certifications added yet.</span>
                       ) : (
@@ -1190,17 +1107,10 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
                                 </div>
                               </div>
                             </div>
-                            <button className="df-edit-icon-btn text-danger ms-2" title="Remove" onClick={() => handleRemoveCert(c.id)}>
-                              <i className="bi bi-trash" />
-                            </button>
                           </div>
                         ))
                       )}
                     </div>
-
-                    <button className="df-add-btn" onClick={() => setShowCertModal(true)}>
-                      <i className="bi bi-plus-lg" /> + Add Certification
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1533,146 +1443,7 @@ function EmployeeDetail({ empId, onBack, initialTab = "resume" }: { empId: numbe
         </div>
       </div>
 
-      {/* Edit About Modal */}
-      {editModalField && (
-        <div className="df-modal-overlay" onClick={() => setEditModalField(null)}>
-          <div className="df-modal-content p-4" onClick={e => e.stopPropagation()}>
-            <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-              <h3 className="df-section-title mb-0" style={{ fontSize: 16 }}>Edit Resume Information</h3>
-              <button className="btn-close" onClick={() => setEditModalField(null)} />
-            </div>
 
-            {(editModalField === "all" || editModalField === "about") && (
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>About</label>
-                <textarea
-                  className="form-control df-input w-100"
-                  rows={3}
-                  value={aboutInput}
-                  onChange={e => setAboutInput(e.target.value)}
-                  placeholder="Tell us about yourself and your background..."
-                />
-              </div>
-            )}
-
-            {(editModalField === "all" || editModalField === "whatILove") && (
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>What I love about my job</label>
-                <textarea
-                  className="form-control df-input w-100"
-                  rows={3}
-                  value={whatILoveInput}
-                  onChange={e => setWhatILoveInput(e.target.value)}
-                  placeholder="Share what drives and motivates you..."
-                />
-              </div>
-            )}
-
-            {(editModalField === "all" || editModalField === "interests") && (
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>My interests and hobbies</label>
-                <textarea
-                  className="form-control df-input w-100"
-                  rows={3}
-                  value={interestsInput}
-                  onChange={e => setInterestsInput(e.target.value)}
-                  placeholder="Personal interests, hobbies, activities..."
-                />
-              </div>
-            )}
-
-            <div className="d-flex justify-content-end gap-2 mt-4 pt-2 border-top">
-              <button className="df-btn-secondary" onClick={() => setEditModalField(null)}>Cancel</button>
-              <button className="df-btn-primary" onClick={handleSaveAbout}>Save Changes</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Skill Modal */}
-      {showSkillModal && (
-        <div className="df-modal-overlay" onClick={() => setShowSkillModal(false)}>
-          <div className="df-modal-content p-4" onClick={e => e.stopPropagation()}>
-            <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-              <h3 className="df-section-title mb-0" style={{ fontSize: 16 }}>Add New Skill</h3>
-              <button className="btn-close" onClick={() => setShowSkillModal(false)} />
-            </div>
-
-            <form onSubmit={handleAddSkill}>
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Skill Name</label>
-                <input
-                  type="text"
-                  className="form-control df-input w-100"
-                  value={newSkillName}
-                  onChange={e => setNewSkillName(e.target.value)}
-                  placeholder="e.g. React, Docker, Project Management, SQL"
-                  autoFocus
-                />
-              </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-4 pt-2 border-top">
-                <button type="button" className="df-btn-secondary" onClick={() => setShowSkillModal(false)}>Cancel</button>
-                <button type="submit" className="df-btn-primary" disabled={!newSkillName.trim()}>Add Skill</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add Certification Modal */}
-      {showCertModal && (
-        <div className="df-modal-overlay" onClick={() => setShowCertModal(false)}>
-          <div className="df-modal-content p-4" onClick={e => e.stopPropagation()}>
-            <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-              <h3 className="df-section-title mb-0" style={{ fontSize: 16 }}>Add Certification</h3>
-              <button className="btn-close" onClick={() => setShowCertModal(false)} />
-            </div>
-
-            <form onSubmit={handleAddCert}>
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Certification Title *</label>
-                <input
-                  type="text"
-                  className="form-control df-input w-100"
-                  value={newCertTitle}
-                  onChange={e => setNewCertTitle(e.target.value)}
-                  placeholder="e.g. AWS Certified Solutions Architect"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Issuing Organization</label>
-                <input
-                  type="text"
-                  className="form-control df-input w-100"
-                  value={newCertIssuer}
-                  onChange={e => setNewCertIssuer(e.target.value)}
-                  placeholder="e.g. Amazon Web Services, Google, Scrum Alliance"
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Issue Date / Year</label>
-                <input
-                  type="text"
-                  className="form-control df-input w-100"
-                  value={newCertDate}
-                  onChange={e => setNewCertDate(e.target.value)}
-                  placeholder="e.g. 2024-03"
-                />
-              </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-4 pt-2 border-top">
-                <button type="button" className="df-btn-secondary" onClick={() => setShowCertModal(false)}>Cancel</button>
-                <button type="submit" className="df-btn-primary" disabled={!newCertTitle.trim()}>Add Certification</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1932,7 +1703,11 @@ function TimeOff() {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to download attachment");
+      setFeedback({
+        type: "error",
+        title: "Download Failed",
+        message: err instanceof Error ? err.message : "Failed to download attachment",
+      });
     }
   }
 
@@ -2312,9 +2087,8 @@ function Navbar({ page, onNav, user, onLogout }: { page: Page; onNav: (p: Page) 
 
   return (
     <nav className="df-navbar" style={{ position: "relative" }}>
-      <a className="df-logo" onClick={() => onNav("dashboard")} style={{ cursor: "pointer" }}>
-        <div className="df-logo-mark">D</div>
-        <span>Dayflow</span>
+      <a onClick={() => onNav("dashboard")} style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+        <img src={logoImg} alt="Dayflow" style={{ height: "35px" }} />
       </a>
 
       {links.map(l => (
@@ -2416,6 +2190,8 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  // Pending session to commit after showing success modal
+  const [pendingSession, setPendingSession] = useState<{ token: string; refreshToken: string; user: ApiUser } | null>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -2433,7 +2209,28 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
         setMode("login");
       } else {
         const session = await login(email, password);
-        onLogin(session.access_token, session.refresh_token, session.user);
+        try {
+          // Validate role before showing success — throws for non-admin roles
+          if (!["ADMIN", "HR"].includes(session.user.role.toUpperCase())) {
+            throw new Error("This admin portal is available only to Admin and HR accounts.");
+          }
+          // Store the session temporarily and show success feedback first
+          setPendingSession({ token: session.access_token, refreshToken: session.refresh_token, user: session.user });
+          setFeedback({
+            type: "success",
+            title: `Welcome back, ${session.user.full_name?.split(" ")[0] || "Admin"}!`,
+            message: "Sign in successful. Taking you to the dashboard...",
+          });
+        } catch (roleError) {
+          // Role check failed — show error modal instead of crashing
+          const errMsg = roleError instanceof Error ? roleError.message : "Access denied for this portal.";
+          setError(errMsg);
+          setFeedback({
+            type: "error",
+            title: "Access Denied",
+            message: errMsg,
+          });
+        }
       }
     } catch (loginError) {
       const errMsg = loginError instanceof Error ? loginError.message : "Unable to sign in";
@@ -2448,30 +2245,159 @@ function LoginScreen({ onLogin }: { onLogin: (token: string, refreshToken: strin
     }
   }
 
-  return <div className="d-flex align-items-center justify-content-center min-vh-100" style={{ background: "var(--df-surface)" }}>
-    <form className="df-card p-4" style={{ width: "min(420px, calc(100% - 32px))" }} onSubmit={submit}>
-      <div className="df-logo mb-4" style={{ background: "var(--df-navy)", width: "fit-content", padding: "8px 12px", borderRadius: 8 }}><div className="df-logo-mark">D</div><span>Dayflow</span></div>
-      <h1 className="df-section-title">{mode === "login" ? "Admin sign in" : "Register an account"}</h1>
-      <p className="df-section-sub mb-4">{mode === "login" ? "Use your Dayflow account to continue." : "Create a Dayflow account to request access."}</p>
-      {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
-      {message && <div className="alert alert-success py-2" role="alert">{message}</div>}
-      {mode === "register" && <div className="d-flex gap-2">
-        <div className="flex-fill"><label className="form-label">First name</label><input className="df-input w-100 mb-3" required value={firstName} onChange={event => setFirstName(event.target.value)} /></div>
-        <div className="flex-fill"><label className="form-label">Last name</label><input className="df-input w-100 mb-3" required value={lastName} onChange={event => setLastName(event.target.value)} /></div>
-      </div>}
-      <label className="form-label">Email</label>
-      <input className="df-input w-100 mb-3" type="email" required value={email} onChange={event => setEmail(event.target.value)} />
-      <label className="form-label">Password</label>
-      <input className="df-input w-100 mb-4" type="password" required value={password} onChange={event => setPassword(event.target.value)} />
-      {mode === "register" && <>
-        <div className="d-flex gap-2"><div className="flex-fill"><label className="form-label">Department ID</label><input className="df-input w-100 mb-3" type="number" min="1" required value={departmentId} onChange={event => setDepartmentId(event.target.value)} /></div><div className="flex-fill"><label className="form-label">Designation ID</label><input className="df-input w-100 mb-3" type="number" min="1" required value={designationId} onChange={event => setDesignationId(event.target.value)} /></div></div>
-        <label className="form-label">Joining date</label><input className="df-input w-100 mb-4" type="date" required value={joiningDate} onChange={event => setJoiningDate(event.target.value)} />
-      </>}
-      <button className="df-btn-primary w-100 justify-content-center" disabled={busy}>{busy ? "Please wait..." : mode === "login" ? "Sign in" : "Register"}</button>
-      <button type="button" className="df-btn-secondary w-100 justify-content-center mt-2" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); setMessage(""); }}>{mode === "login" ? "Create an account" : "Back to sign in"}</button>
-    </form>
-    {feedback && <FeedbackModal feedback={feedback} onClose={() => setFeedback(null)} />}
-  </div>;
+  // When the success feedback modal is closed, commit the session and proceed to dashboard
+  function handleFeedbackClose() {
+    if (pendingSession) {
+      const { token, refreshToken, user } = pendingSession;
+      setPendingSession(null);
+      setFeedback(null);
+      onLogin(token, refreshToken, user);
+    } else {
+      setFeedback(null);
+    }
+  }
+
+  return (
+    <div className="d-flex align-items-center justify-content-center min-vh-100" style={{ background: "#eef4ff", padding: "20px" }}>
+      <div className="shadow-lg d-flex" style={{ maxWidth: "960px", width: "100%", minHeight: "580px", borderRadius: "24px", overflow: "hidden", background: "#ffffff" }}>
+        
+        {/* Left Panel: Wavy blue banner */}
+        <div className="d-none d-md-flex flex-column justify-content-between p-5 text-white position-relative" style={{ flex: "1 1 50%", background: "#1b74e4", overflow: "hidden" }}>
+          {/* Stacked 2D SVG Waves */}
+          <svg 
+            className="position-absolute" 
+            style={{ top: 0, bottom: 0, right: -1, height: "100%", width: "70px", zIndex: 5 }} 
+            viewBox="0 0 100 100" 
+            preserveAspectRatio="none"
+          >
+            <path 
+              d="M100,0 C85,15 75,35 92,50 C99,60 90,80 97,100 L100,100 L100,0 Z" 
+              fill="#ffffff" 
+            />
+          </svg>
+          <svg 
+            className="position-absolute" 
+            style={{ top: 0, bottom: 0, right: 30, height: "100%", width: "70px", zIndex: 4, opacity: 0.3 }} 
+            viewBox="0 0 100 100" 
+            preserveAspectRatio="none"
+          >
+            <path 
+              d="M100,0 C75,15 65,35 85,50 C95,60 80,80 92,100 L100,100 L100,0 Z" 
+              fill="#ffffff" 
+            />
+          </svg>
+          <svg 
+            className="position-absolute" 
+            style={{ top: 0, bottom: 0, right: 60, height: "100%", width: "70px", zIndex: 3, opacity: 0.15 }} 
+            viewBox="0 0 100 100" 
+            preserveAspectRatio="none"
+          >
+            <path 
+              d="M100,0 C65,15 55,35 75,50 C90,60 70,80 85,100 L100,100 L100,0 Z" 
+              fill="#ffffff" 
+            />
+          </svg>
+
+          {/* Left panel contents */}
+          <div className="text-center my-auto" style={{ zIndex: 10 }}>
+            <p className="fs-5 mb-2" style={{ fontWeight: 500, opacity: 0.9 }}>Welcome to</p>
+            
+            {/* White circle with flat rocket icon */}
+            <div className="mx-auto mb-3 d-flex align-items-center justify-content-center bg-white rounded-circle shadow-sm" style={{ width: "110px", height: "110px" }}>
+              <img src={rocketIcon} alt="Rocket Logo" style={{ width: "70px", height: "70px", objectFit: "contain" }} />
+            </div>
+            
+            <h3 className="fw-bold mb-3" style={{ fontSize: "24px" }}>Spacer</h3>
+            
+            <p className="mx-auto" style={{ maxWidth: "300px", fontSize: "12.5px", opacity: 0.85, lineHeight: 1.6 }}>
+              Create your account to unlock premium features and stay updated with the latest news. Join our community and embark on an exciting journey with us!
+            </p>
+          </div>
+
+          <div className="d-flex justify-content-center gap-3 text-white-50" style={{ zIndex: 10, fontSize: "11px", fontWeight: 600 }}>
+            <span>CREATE HERE</span>
+            <span>|</span>
+            <span>DISCOVER HERE</span>
+          </div>
+        </div>
+
+        {/* Right Panel: White login form */}
+        <div className="d-flex flex-column justify-content-center p-4 p-md-5" style={{ flex: "1 1 50%", background: "#ffffff" }}>
+          <div style={{ maxWidth: "380px", width: "100%", margin: "0 auto" }}>
+            <div className="mb-4 text-start">
+              <img src={logoImg} alt="Dayflow Logo" style={{ height: "35px", display: "block", marginBottom: "8px" }} />
+              <p className="text-muted small">Admin management system</p>
+            </div>
+            
+            <h2 className="fs-4 fw-bold mb-1" style={{ color: "#222" }}>{mode === "login" ? "Sign In" : "Create your account"}</h2>
+            <p className="text-muted mb-4 small">Please enter your details below.</p>
+            
+            {error && <div className="alert alert-danger py-2 px-3 small mb-3" role="alert">{error}</div>}
+            {message && <div className="alert alert-success py-2 px-3 small mb-3" role="alert">{message}</div>}
+
+            <form onSubmit={submit}>
+              {mode === "register" && (
+                <div className="row g-2 mb-2">
+                  <div className="col">
+                    <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>First name</label>
+                    <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} required value={firstName} onChange={event => setFirstName(event.target.value)} />
+                  </div>
+                  <div className="col">
+                    <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Last name</label>
+                    <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} required value={lastName} onChange={event => setLastName(event.target.value)} />
+                  </div>
+                </div>
+              )}
+              
+              <div className="mb-2">
+                <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Email</label>
+                <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} type="email" required placeholder="Enter email" value={email} onChange={event => setEmail(event.target.value)} />
+              </div>
+              
+              <div className="mb-3">
+                <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Password</label>
+                <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} type="password" required placeholder="Enter password" value={password} onChange={event => setPassword(event.target.value)} />
+              </div>
+              
+              {mode === "register" && (
+                <>
+                  <div className="row g-2 mb-2">
+                    <div className="col">
+                      <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Dept ID</label>
+                      <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} type="number" min="1" required value={departmentId} onChange={event => setDepartmentId(event.target.value)} />
+                    </div>
+                    <div className="col">
+                      <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Desig ID</label>
+                      <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} type="number" min="1" required value={designationId} onChange={event => setDesignationId(event.target.value)} />
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-secondary small mb-1" style={{ fontWeight: 600 }}>Joining date</label>
+                    <input className="df-input w-100" style={{ background: "#f0f4fd", border: "none" }} type="date" required value={joiningDate} onChange={event => setJoiningDate(event.target.value)} />
+                  </div>
+                </>
+              )}
+
+              <button className="df-btn-primary w-100 justify-content-center py-2.5 fs-6 mt-3 shadow-sm" style={{ background: "#1b74e4", border: "none" }} disabled={busy}>
+                {busy ? <span className="spinner-border spinner-border-sm me-2" /> : null}
+                {mode === "login" ? "Sign In" : "Sign Up"}
+              </button>
+              
+              <div className="text-center mt-3 small">
+                <span className="text-muted">{mode === "login" ? "Don't have an account? " : "Already have an account? "}</span>
+                <button type="button" className="btn btn-link p-0 text-decoration-none small fw-bold" style={{ color: "#1b74e4" }} onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); setMessage(""); }}>
+                  {mode === "login" ? "Create Here" : "Sign In"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      </div>
+
+      {feedback && <FeedbackModal feedback={feedback} onClose={handleFeedbackClose} />}
+    </div>
+  );
 }
 
 export default function App() {

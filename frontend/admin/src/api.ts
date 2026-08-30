@@ -81,6 +81,20 @@ export interface ApiSalary {
   }>;
 }
 
+export interface ApiResume {
+  employee_id: number;
+  about: string | null;
+  what_i_love: string | null;
+  interests: string | null;
+  skills: string[] | null;
+  certifications: Array<{
+    id: number;
+    title: string;
+    issuer: string;
+    issueDate: string;
+  }> | null;
+}
+
 export interface ApiDepartment {
   department_id: number;
   department_name: string;
@@ -128,6 +142,7 @@ export async function signup(payload: {
 export const api = {
   employees: (token: string) => request<Page<ApiEmployee>>("/employees?page_size=100", {}, token),
   employee: (id: number, token: string) => request<ApiEmployee>(`/employees/${id}`, {}, token),
+  resume: (id: number, token: string) => request<ApiResume>(`/employees/${id}/resume`, {}, token),
   departments: (token: string) => request<{ items: ApiDepartment[] }>("/departments", {}, token),
   designations: (token: string) => request<{ items: ApiDesignation[] }>("/designations", {}, token),
   inviteEmployee: (payload: {

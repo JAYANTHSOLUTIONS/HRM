@@ -16,6 +16,11 @@ from app.routers.me import router as me_router, employee_dashboard_router
 settings = get_settings()
 logger = logging.getLogger("dayflow.part2")
 
+# Automatically create all tables (including newly defined ones like employee_resumes)
+from app.core.database import Base, engine
+import app.models  # noqa: F401
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="Dayflow HRMS — Admin/HR API (Part 2)",
     description=(

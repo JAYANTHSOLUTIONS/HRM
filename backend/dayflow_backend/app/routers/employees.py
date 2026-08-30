@@ -3,12 +3,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_admin, require_admin_or_hr
+from app.core.deps import require_admin, require_admin_or_hr, get_current_user
 from app.models.auth import User
 from app.schemas.employee import EmployeeListItem, EmployeeDetail, EmployeeUpdate
+from app.schemas.resume import ResumeOut, ResumeUpdate
 from app.schemas.common import Page
-from app.services.employee_service import list_employees, get_employee_or_404, apply_employee_update
+from app.services.employee_service import (
+    list_employees, get_employee_or_404, apply_employee_update,
+    get_employee_resume, update_employee_resume
+)
 from app.services.audit_service import write_audit_log
+from app.exceptions import forbidden
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -67,3 +72,43 @@ def update_employee(
     db.commit()
     db.refresh(employee)
     return _attach_email(employee)
+
+
+@router.get("/{employee_id}/resume", response_model=ResumeOut)
+def get_resume(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ResumeOut:
+    """Get an employee's resume. Employees can view their own; HR/Admin can view anyone's."""
+    is_employee = current_user.role_name.upper() == "EMPLOYEE"
+    if is_employee:
+        if not current_user.employee or current_user.employee.employee_id != employee_id:
+            raise forbidden("You are only allowed to view your own resume.")
+            
+    resume = get_employee_resume(db, employee_id)
+    return resume
+
+
+@router.patch("/{employee_id}/resume", response_model=ResumeOut)
+def update_resume(
+    employee_id: int,
+    payload: ResumeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ResumeOut:
+    """Update an employee's resume. Only the employee themselves can edit their resume."""
+    if not current_user.employee or current_user.employee.employee_id != employee_id:
+        raise forbidden("You are only allowed to edit your own resume.")
+        
+    resume = update_employee_resume(db, employee_id, payload.model_dump(exclude_unset=True))
+    
+    # Optional: Log the audit event
+    write_audit_log(
+        db, actor_user_id=current_user.user_id, action="EMPLOYEE_RESUME_UPDATED",
+        target_entity="employee_resumes", target_id=employee_id,
+        old_values={}, new_values=payload.model_dump(exclude_unset=True)
+    )
+    db.commit()
+    
+    return resume
